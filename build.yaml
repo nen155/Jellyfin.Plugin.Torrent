@@ -1,0 +1,31 @@
+name: "Torrent Search"
+guid: "5c1b8a63-7e42-4b0f-9d61-3a8f2c4e9b17"
+version: "1.1.0.0"
+targetAbi: "12.1.0.0"
+framework: "net10.0"
+owner: "NeN"
+overview: "Buscador de torrents en las webs que configures, con todos los datos de cada resultado y envío directo al cliente de descargas."
+description: >
+  Meta-buscador que hace de proxy entre tus búsquedas y las webs de torrents
+  que añadas. Cada fuente se define con su URL de búsqueda (GET o POST) y
+  selectores CSS, o con su API JSON. De cada resultado se extrae todo lo que
+  publique la web: enlaces magnet y .torrent, semillas y clientes, tamaño,
+  idioma (castellano, latino, VOSE, multi…), resolución, códec de vídeo y
+  audio, HDR, grupo, fecha, carátula, sinopsis y los pares de datos de la
+  ficha (director, reparto, género…). Los enlaces se pueden enviar a
+  qBittorrent, Transmission o Deluge, con detección automática del que
+  responda, o abrirse como magnet en el navegador. Incluye resolución
+  automática del dominio para webs que cambian de dirección (página HTTP o
+  canal de Discord), fuentes Torznab (Jackett/Prowlarr) y un navegador
+  headless (Chrome/Edge por CDP) que ejecuta el JavaScript de las webs,
+  resuelve retos anti-bot y pulsa los botones de descarga protegidos,
+  capturando el .torrent con las cookies de la sesión.
+category: "General"
+artifacts:
+  - "Jellyfin.Plugin.Torrent.dll"
+  - "AngleSharp.dll"
+changelog: |-
+  - 1.1.0: navegador headless (CDP) y FlareSolverr, captura de descargas
+    protegidas, fuentes Torznab, resolución de páginas de descarga
+    intermedias y plantillas de WatchSoMuch y DonTorrent.
+  - 1.0.0: versión inicial.

@@ -1,0 +1,1061 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <title>Torrent Search</title>
+</head>
+
+<body>
+    <div id="TorrentConfigPage" data-role="page" class="page type-interior pluginConfigurationPage"
+        data-require="emby-input,emby-button,emby-toggle,emby-checkbox,emby-select">
+        <style>
+            #TorrentConfigPage .tc-tabs { display: flex; gap: .25rem; border-bottom: 1px solid rgba(127,127,127,.3); margin-bottom: 1rem; flex-wrap: wrap; }
+            #TorrentConfigPage .tc-tab {
+                padding: .5rem .9rem; cursor: pointer; border-radius: 6px 6px 0 0; font-size: .9rem;
+                border: 1px solid transparent; border-bottom: none;
+            }
+            #TorrentConfigPage .tc-tab.on { background: rgba(127,127,127,.15); border-color: rgba(127,127,127,.3); font-weight: 600; }
+            #TorrentConfigPage .tc-pane { display: none; }
+            #TorrentConfigPage .tc-pane.on { display: block; }
+            #TorrentConfigPage .tc-source {
+                display: flex; align-items: center; gap: .6rem; padding: .5rem .6rem; border-radius: 6px;
+                background: rgba(127,127,127,.1); margin-bottom: .4rem;
+            }
+            #TorrentConfigPage .tc-source .tc-name { flex: 1; min-width: 0; }
+            #TorrentConfigPage .tc-source .tc-name small { display: block; opacity: .65; font-size: .75rem; }
+            #TorrentConfigPage .tc-source.off { opacity: .55; }
+            #TorrentConfigPage .tc-source button { font-size: .75rem; }
+            #TorrentConfigPage .tc-group { border: 1px solid rgba(127,127,127,.25); border-radius: 8px; margin: .6rem 0; padding: .25rem .8rem .6rem; }
+            #TorrentConfigPage .tc-group summary { cursor: pointer; font-weight: 600; padding: .35rem 0; }
+            #TorrentConfigPage .tc-field { margin: .5rem 0; }
+            #TorrentConfigPage .tc-field label { display: block; font-size: .82rem; opacity: .8; margin-bottom: .15rem; }
+            #TorrentConfigPage .tc-field input[type=text], #TorrentConfigPage .tc-field input[type=number],
+            #TorrentConfigPage .tc-field input[type=password], #TorrentConfigPage .tc-field textarea,
+            #TorrentConfigPage .tc-field select {
+                width: 100%; padding: .4rem .5rem; border-radius: 6px; border: 1px solid rgba(127,127,127,.45);
+                background: rgba(127,127,127,.08); color: inherit; font-size: .88rem; box-sizing: border-box;
+            }
+            #TorrentConfigPage .tc-field textarea { font-family: monospace; font-size: .8rem; }
+            #TorrentConfigPage .tc-hint { font-size: .75rem; opacity: .6; margin-top: .15rem; }
+            #TorrentConfigPage .tc-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem 1rem; }
+            #TorrentConfigPage .tc-row { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; margin: .5rem 0; }
+            #TorrentConfigPage .tc-status { font-size: .82rem; margin-top: .5rem; white-space: pre-wrap; }
+            #TorrentConfigPage .tc-probe { font-size: .8rem; }
+            #TorrentConfigPage .tc-probe .ok { color: #58c76a; }
+            #TorrentConfigPage .tc-probe .ko { color: #d0736a; }
+            #TorrentConfigPage .tc-editor { border: 1px solid var(--theme-primary-color, #00a4dc); border-radius: 8px; padding: .75rem 1rem; margin-top: .75rem; }
+            #TorrentConfigPage .tc-editor-head { display: flex; justify-content: space-between; align-items: center; gap: 1rem; }
+            #TorrentConfigPage .tc-preview { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: .5rem; margin-top: .5rem; }
+            #TorrentConfigPage .tc-preview .tc-prev { font-size: .78rem; padding: .5rem; border-radius: 6px; background: rgba(127,127,127,.1); }
+            @media (max-width: 700px) { #TorrentConfigPage .tc-grid2 { grid-template-columns: 1fr; } }
+        </style>
+
+        <div data-role="content">
+            <div class="content-primary">
+                <h1 style="margin-bottom:.25rem">Torrent Search</h1>
+                <div class="fieldDescription">
+                    Meta-buscador: consulta las webs que configures, extrae sus enlaces y los envía al cliente
+                    de torrents. La página de búsqueda está en el menú lateral del panel.
+                </div>
+
+                <div class="tc-row">
+                    <button is="emby-button" type="button" id="tcOpenSearch" class="raised">
+                        <span>Abrir el buscador</span>
+                    </button>
+                </div>
+
+                <div class="tc-tabs" style="margin-top:1rem">
+                    <div class="tc-tab on" data-tab="general">General</div>
+                    <div class="tc-tab" data-tab="sources">Fuentes</div>
+                    <div class="tc-tab" data-tab="browser">Navegador</div>
+                    <div class="tc-tab" data-tab="client">Cliente de descargas</div>
+                </div>
+
+                <div class="tc-pane on" id="tcPaneGeneral">
+                    <div class="checkboxContainer checkboxContainer-withDescription">
+                        <label>
+                            <input is="emby-toggle" type="checkbox" id="tcEnabled" />
+                            <span>Plugin activo</span>
+                        </label>
+                        <div class="fieldDescription checkboxFieldDescription">
+                            Desactiva la búsqueda sin perder las fuentes configuradas.
+                        </div>
+                    </div>
+
+                    <div class="checkboxContainer checkboxContainer-withDescription">
+                        <label>
+                            <input is="emby-toggle" type="checkbox" id="tcProxyImages" />
+                            <span>Servir las carátulas a través del plugin</span>
+                        </label>
+                        <div class="fieldDescription checkboxFieldDescription">
+                            Evita bloqueos por referer y contenido mixto. Se cachean en disco.
+                        </div>
+                    </div>
+
+                    <div class="tc-grid2">
+                        <div class="tc-field">
+                            <label for="tcTimeout">Tiempo máximo por petición (s)</label>
+                            <input type="number" id="tcTimeout" min="5" max="120" />
+                        </div>
+                        <div class="tc-field">
+                            <label for="tcMaxResults">Máximo de resultados por fuente</label>
+                            <input type="number" id="tcMaxResults" min="5" max="500" />
+                        </div>
+                        <div class="tc-field">
+                            <label for="tcMinSeeds">Semillas mínimas por defecto</label>
+                            <input type="number" id="tcMinSeeds" min="0" />
+                        </div>
+                        <div class="tc-field">
+                            <label for="tcDetailLimit">Fichas de detalle por búsqueda (0 = todas)</label>
+                            <input type="number" id="tcDetailLimit" min="0" max="100" />
+                        </div>
+                        <div class="tc-field">
+                            <label for="tcCache">Minutos de caché de búsqueda</label>
+                            <input type="number" id="tcCache" min="0" max="720" />
+                        </div>
+                        <div class="tc-field">
+                            <label for="tcUserAgent">User-Agent</label>
+                            <input type="text" id="tcUserAgent" />
+                        </div>
+                    </div>
+
+                    <div class="tc-field">
+                        <label for="tcBlocked">Palabras bloqueadas (una por línea)</label>
+                        <textarea id="tcBlocked" rows="3"></textarea>
+                        <div class="tc-hint">
+                            Los resultados que contengan alguna de estas palabras se descartan
+                            (por ejemplo: cam, ts, screener).
+                        </div>
+                    </div>
+                </div>
+
+                <div class="tc-pane" id="tcPaneSources">
+                    <div class="tc-row">
+                        <button is="emby-button" type="button" id="tcAddSource" class="raised button-submit">
+                            <span>Añadir fuente</span>
+                        </button>
+                        <select is="emby-select" id="tcTemplateSelect" style="min-width:260px"></select>
+                        <button is="emby-button" type="button" id="tcAddTemplate" class="raised">
+                            <span>Añadir plantilla</span>
+                        </button>
+                    </div>
+                    <div class="fieldDescription" id="tcTemplateNote"></div>
+
+                    <div id="tcSourcesList" style="margin-top:.75rem"></div>
+                    <div id="tcEditorHost"></div>
+                </div>
+
+                <div class="tc-pane" id="tcPaneBrowser">
+                    <div class="fieldDescription">
+                        El plugin puede abrir las webs en un Chrome/Edge headless real: ejecuta su
+                        JavaScript (buscadores dinámicos), resuelve retos anti-bot y pulsa los botones de
+                        descarga protegidos, capturando el enlace que genera la propia web.
+                    </div>
+
+                    <div class="tc-grid2" style="margin-top:.75rem">
+                        <div class="tc-field">
+                            <label for="tcBrowserMode">Motor</label>
+                            <select id="tcBrowserMode">
+                                <option value="Auto">Automático (CDP y, si falla, FlareSolverr)</option>
+                                <option value="Cdp">Solo navegador (CDP)</option>
+                                <option value="FlareSolverr">Solo FlareSolverr</option>
+                                <option value="None">Desactivado</option>
+                            </select>
+                        </div>
+                        <div class="tc-field">
+                            <label for="tcBrowserExe">Ejecutable de Chrome/Edge/Chromium</label>
+                            <input type="text" id="tcBrowserExe" placeholder="(detección automática)" />
+                            <div class="tc-hint">Vacío = se busca Chrome, Edge o Chromium instalado.</div>
+                        </div>
+                        <div class="tc-field">
+                            <label for="tcBrowserFlare">URL de FlareSolverr</label>
+                            <input type="text" id="tcBrowserFlare" placeholder="http://localhost:8191" />
+                            <div class="tc-hint">Opcional. Servicio externo que resuelve Cloudflare.</div>
+                        </div>
+                        <div class="tc-field">
+                            <label for="tcBrowserTimeout">Tiempo máximo de navegación (s)</label>
+                            <input type="number" id="tcBrowserTimeout" min="5" max="180" />
+                        </div>
+                        <div class="tc-field">
+                            <label for="tcBrowserIdle">Cerrar tras inactividad (s)</label>
+                            <input type="number" id="tcBrowserIdle" min="30" max="3600" />
+                        </div>
+                        <div class="tc-field">
+                            <label for="tcBrowserUa">User-Agent del navegador</label>
+                            <input type="text" id="tcBrowserUa" placeholder="(el del navegador)" />
+                        </div>
+                    </div>
+
+                    <div class="checkboxContainer checkboxContainer-withDescription">
+                        <label>
+                            <input is="emby-toggle" type="checkbox" id="tcBrowserHeadless" />
+                            <span>Modo headless (sin ventana)</span>
+                        </label>
+                    </div>
+
+                    <div class="tc-row">
+                        <button is="emby-button" type="button" id="tcBrowserProbe" class="raised">
+                            <span>Comprobar navegador</span>
+                        </button>
+                        <input type="text" id="tcBrowserTestUrl" placeholder="https://..."
+                            style="flex:1 1 240px;padding:.4rem .5rem;border-radius:6px;border:1px solid rgba(127,127,127,.45);background:rgba(127,127,127,.08);color:inherit" />
+                        <button is="emby-button" type="button" id="tcBrowserTest" class="raised">
+                            <span>Probar URL</span>
+                        </button>
+                    </div>
+                    <div class="tc-probe" id="tcBrowserResult"></div>
+                </div>
+
+                <div class="tc-pane" id="tcPaneClient">
+                    <div class="fieldDescription">
+                        El plugin habla con el cliente por su interfaz web/API. En modo automático prueba
+                        qBittorrent, Transmission y Deluge en el host y puerto indicados, y si ninguno responde
+                        devuelve el enlace magnet al navegador.
+                    </div>
+
+                    <div class="tc-grid2" style="margin-top:.75rem">
+                        <div class="tc-field">
+                            <label for="tcClientKind">Cliente</label>
+                            <select id="tcClientKind">
+                                <option value="Auto">Automático</option>
+                                <option value="QBittorrent">qBittorrent (WebUI)</option>
+                                <option value="Transmission">Transmission (RPC)</option>
+                                <option value="Deluge">Deluge (Web)</option>
+                                <option value="MagnetOnly">Solo enlace magnet</option>
+                            </select>
+                        </div>
+                        <div class="tc-field">
+                            <label for="tcClientHost">Host</label>
+                            <input type="text" id="tcClientHost" placeholder="http://localhost" />
+                            <div class="tc-hint">Incluye el esquema si usas https (p. ej. http://192.168.1.10).</div>
+                        </div>
+                        <div class="tc-field">
+                            <label for="tcClientPort">Puerto</label>
+                            <input type="number" id="tcClientPort" min="1" max="65535" />
+                            <div class="tc-hint">qBittorrent 8080 · Transmission 9091 · Deluge 8112.</div>
+                        </div>
+                        <div class="tc-field">
+                            <label for="tcClientUser">Usuario</label>
+                            <input type="text" id="tcClientUser" autocomplete="off" />
+                        </div>
+                        <div class="tc-field">
+                            <label for="tcClientPass">Contraseña</label>
+                            <input type="password" id="tcClientPass" autocomplete="new-password" />
+                            <div class="tc-hint">Se guarda en la configuración del plugin (XML del servidor).</div>
+                        </div>
+                        <div class="tc-field">
+                            <label for="tcClientPath">Carpeta de descarga</label>
+                            <input type="text" id="tcClientPath" placeholder="(la del cliente)" />
+                        </div>
+                        <div class="tc-field">
+                            <label for="tcClientCategory">Categoría (qBittorrent)</label>
+                            <input type="text" id="tcClientCategory" placeholder="peliculas" />
+                        </div>
+                        <div class="tc-field">
+                            <label for="tcClientTags">Etiquetas (separadas por comas)</label>
+                            <input type="text" id="tcClientTags" />
+                        </div>
+                    </div>
+
+                    <div class="checkboxContainer checkboxContainer-withDescription">
+                        <label>
+                            <input is="emby-toggle" type="checkbox" id="tcClientPaused" />
+                            <span>Añadir en pausa</span>
+                        </label>
+                    </div>
+
+                    <div class="tc-row">
+                        <button is="emby-button" type="button" id="tcProbeClient" class="raised">
+                            <span>Probar conexión</span>
+                        </button>
+                    </div>
+                    <div class="tc-probe" id="tcProbeResult"></div>
+                </div>
+
+                <div class="tc-row" style="margin-top:1.5rem">
+                    <button is="emby-button" type="button" id="tcSave" class="raised button-submit">
+                        <span>Guardar</span>
+                    </button>
+                    <span class="tc-status" id="tcSaveStatus"></span>
+                </div>
+            </div>
+        </div>
+
+        <script type="text/javascript">
+            var TorrentConfig = {
+                pluginUniqueId: '5c1b8a63-7e42-4b0f-9d61-3a8f2c4e9b17'
+            };
+
+            var TC = {
+                config: null,
+                templates: [],
+                editingIndex: -1
+            };
+
+            var SOURCE_FIELDS = [
+                { key: 'Name', label: 'Nombre', section: 'basico', type: 'text' },
+                { key: 'BaseUrl', label: 'URL base', section: 'basico', type: 'text', hint: 'Sin barra final. Ej.: https://miweb.to' },
+                {
+                    key: 'Kind', label: 'Tipo de extracción', section: 'basico', type: 'select',
+                    options: [['Html', 'HTML con selectores CSS'], ['Json', 'JSON (API de la web)'],
+                        ['Torznab', 'Torznab (Jackett/Prowlarr)']]
+                },
+                {
+                    key: 'FetchMode', label: 'Motor de la búsqueda', section: 'basico', type: 'select',
+                    options: [['Http', 'HTTP (rápido, sin JavaScript)'], ['Browser', 'Navegador (ejecuta JavaScript)'],
+                        ['Auto', 'Automático (HTTP y, si bloquea, navegador)']],
+                    hint: 'Usa Navegador en webs cuyo buscador funciona con JavaScript.'
+                },
+                { key: 'MaxPages', label: 'Páginas de resultados', section: 'basico', type: 'number' },
+                { key: 'DelayMs', label: 'Pausa entre peticiones (ms)', section: 'basico', type: 'number' },
+                {
+                    key: 'SearchUrl', label: 'URL de búsqueda', section: 'busqueda', type: 'text',
+                    hint: 'Admite {base}, {query} y {page}. Ej.: {base}/search/{query}/{page}/'
+                },
+                {
+                    key: 'SearchMethod', label: 'Método', section: 'busqueda', type: 'select',
+                    options: [['Get', 'GET (consulta en la URL)'], ['Post', 'POST (formulario)']]
+                },
+                {
+                    key: 'SearchBody', label: 'Cuerpo del POST', section: 'busqueda', type: 'text',
+                    hint: 'Solo si usas POST. Ej.: valor={query}&pagina={page}'
+                },
+                { key: 'Cookie', label: 'Cookie de sesión', section: 'busqueda', type: 'text', hint: 'Opcional, para webs que la exigen.' },
+                {
+                    key: 'Headers', label: 'Cabeceras extra', section: 'busqueda', type: 'pairs',
+                    hint: 'Una por línea con el formato Nombre: valor'
+                },
+                { key: 'RowSelector', label: 'Selector de fila', section: 'html', type: 'text', hint: 'Cada resultado de la lista.' },
+                { key: 'TitleSelector', label: 'Selector del título', section: 'html', type: 'text' },
+                { key: 'LinkSelector', label: 'Selector del enlace a la ficha', section: 'html', type: 'text', hint: 'Usa a@href para leer el atributo.' },
+                { key: 'MagnetSelector', label: 'Selector del magnet (en la lista)', section: 'html', type: 'text' },
+                { key: 'TorrentSelector', label: 'Selector del .torrent (en la lista)', section: 'html', type: 'text' },
+                { key: 'SizeSelector', label: 'Selector del tamaño', section: 'html', type: 'text' },
+                { key: 'SeedsSelector', label: 'Selector de semillas', section: 'html', type: 'text' },
+                { key: 'LeechesSelector', label: 'Selector de clientes', section: 'html', type: 'text' },
+                { key: 'DateSelector', label: 'Selector de la fecha', section: 'html', type: 'text' },
+                { key: 'PosterSelector', label: 'Selector de la carátula', section: 'html', type: 'text' },
+                { key: 'CategorySelector', label: 'Selector de la categoría', section: 'html', type: 'text' },
+                { key: 'LanguageSelector', label: 'Selector del idioma', section: 'html', type: 'text' },
+                { key: 'CompletedSelector', label: 'Selector de descargas completadas', section: 'html', type: 'text' },
+                {
+                    key: 'FetchDetails', label: 'Visitar la ficha de detalle', section: 'detalle', type: 'checkbox',
+                    hint: 'Necesario si los enlaces o la carátula solo están en la ficha.'
+                },
+                { key: 'DetailMagnetSelector', label: 'Magnet en la ficha', section: 'detalle', type: 'text' },
+                { key: 'DetailTorrentSelector', label: '.torrent en la ficha', section: 'detalle', type: 'text' },
+                { key: 'DetailPosterSelector', label: 'Carátula en la ficha', section: 'detalle', type: 'text' },
+                { key: 'DetailDescriptionSelector', label: 'Sinopsis en la ficha', section: 'detalle', type: 'text' },
+                { key: 'DetailSizeSelector', label: 'Tamaño en la ficha', section: 'detalle', type: 'text' },
+                { key: 'DetailDateSelector', label: 'Fecha en la ficha', section: 'detalle', type: 'text' },
+                { key: 'DetailLanguageSelector', label: 'Idioma en la ficha', section: 'detalle', type: 'text' },
+                { key: 'DetailSeedsSelector', label: 'Semillas en la ficha', section: 'detalle', type: 'text' },
+                { key: 'DetailLeechesSelector', label: 'Clientes en la ficha', section: 'detalle', type: 'text' },
+                {
+                    key: 'DetailFetchMode', label: 'Motor de la ficha', section: 'detalle', type: 'select',
+                    options: [['Inherit', 'El mismo que la búsqueda'], ['Http', 'HTTP'], ['Browser', 'Navegador'],
+                        ['Auto', 'Automático']]
+                },
+                {
+                    key: 'ResolveReleaseLinks', label: 'Abrir los enlaces de descarga intermedios',
+                    section: 'detalle', type: 'checkbox',
+                    hint: 'Si la ficha enlaza a /Download-123/release en vez del .torrent, se abren para sacar el magnet.'
+                },
+                { key: 'DetailWaitSelector', label: 'Esperar este selector en la ficha', section: 'navegador', type: 'text' },
+                { key: 'DetailBrowserWaitMs', label: 'Espera tras cargar la ficha (ms)', section: 'navegador', type: 'number' },
+                {
+                    key: 'DetailBrowserScript', label: 'JavaScript en la ficha', section: 'navegador', type: 'text',
+                    hint: 'Ej.: pulsar el botón de descarga -> (function(){var b=document.querySelector(\'.protected-download\');if(b){b.click();}})()'
+                },
+                { key: 'JsonResultsPath', label: 'Ruta al array de resultados', section: 'json', type: 'text', hint: 'Ej.: data.items o $ para la raíz.' },
+                {
+                    key: 'JsonFields', label: 'Mapa de campos', section: 'json', type: 'pairs',
+                    hint: 'Una por línea: campo = ruta. Campos: title, releaseName, id, detailUrl, magnet, torrentUrl, size, seeds, leeches, date, poster, category, language, description, completed.'
+                },
+                { key: 'JsonStripPrefix', label: 'Prefijo a eliminar', section: 'json', type: 'text', hint: 'Para respuestas tipo var datos = [...]' },
+                { key: 'JsonFilterField', label: 'Campo de filtrado local', section: 'json', type: 'text', hint: 'Solo si la web devuelve un catálogo completo en vez de resultados.' },
+                { key: 'DetailUrlTemplate', label: 'Plantilla de la ficha', section: 'json', type: 'text', hint: 'Ej.: {base}/item/{id}' },
+                { key: 'BrowserWaitSelector', label: 'Esperar este selector (búsqueda)', section: 'navegador', type: 'text', hint: 'La página se considera cargada cuando aparece (p. ej. la lista de resultados).' },
+                { key: 'BrowserWaitMs', label: 'Espera tras cargar (ms)', section: 'navegador', type: 'number' },
+                {
+                    key: 'BrowserScript', label: 'JavaScript en la búsqueda', section: 'navegador', type: 'text',
+                    hint: 'Se ejecuta tras cargar la URL. {query} se sustituye por el texto buscado.'
+                },
+                {
+                    key: 'DomainProvider', label: 'Resolución de dominio', section: 'dominio', type: 'select',
+                    options: [['None', 'No (URL base fija)'], ['HttpPage', 'Leer una página web'], ['Discord', 'Canal de Discord']]
+                },
+                { key: 'DomainUrl', label: 'Página que publica el dominio', section: 'dominio', type: 'text' },
+                { key: 'DomainRegex', label: 'Expresión regular del dominio', section: 'dominio', type: 'text', hint: 'Vacío = se busca el mismo nombre de dominio que la URL base.' },
+                { key: 'DiscordBotToken', label: 'Token del bot de Discord', section: 'dominio', type: 'text' },
+                { key: 'DiscordChannelId', label: 'ID del canal de Discord', section: 'dominio', type: 'text' },
+                { key: 'DomainCacheMinutes', label: 'Minutos de caché del dominio', section: 'dominio', type: 'number' },
+                { key: 'DomainAutoApply', label: 'Aplicar el dominio automáticamente', section: 'dominio', type: 'checkbox' }
+            ];
+
+            var SECTIONS = [
+                ['basico', 'Básico'],
+                ['busqueda', 'Búsqueda'],
+                ['html', 'Extracción HTML'],
+                ['detalle', 'Ficha de detalle'],
+                ['navegador', 'Navegador (JavaScript)'],
+                ['json', 'Extracción JSON'],
+                ['dominio', 'Dominio cambiante']
+            ];
+
+            var TC_KEY_MAP = {};
+            (function () {
+                var base = ['Id', 'Name', 'Enabled', 'Kind', 'BaseUrl', 'SearchUrl', 'SearchMethod',
+                    'SearchBody', 'Headers', 'Cookie', 'MaxPages', 'DelayMs', 'FetchDetails',
+                    'JsonFields', 'Domain'];
+                base.forEach(function (key) { TC_KEY_MAP[key.toLowerCase()] = key; });
+                SOURCE_FIELDS.forEach(function (field) { TC_KEY_MAP[field.key.toLowerCase()] = field.key; });
+            })();
+
+            var TC_DOMAIN_KEY_MAP = {};
+            ['Provider', 'Url', 'Regex', 'DiscordBotToken', 'DiscordChannelId', 'CacheMinutes', 'AutoApply']
+                .forEach(function (key) { TC_DOMAIN_KEY_MAP[key.toLowerCase()] = key; });
+
+            function tcNormalizePairs(list) {
+                return (list || []).map(function (item) {
+                    return {
+                        Name: item.Name !== undefined && item.Name !== null ? item.Name : (item.name || ''),
+                        Value: item.Value !== undefined && item.Value !== null ? item.Value : (item.value || '')
+                    };
+                });
+            }
+
+            function tcNormalizeSource(raw) {
+                var source = {};
+                var input = raw || {};
+                Object.keys(input).forEach(function (key) {
+                    var canonical = TC_KEY_MAP[key.toLowerCase()] || key;
+                    source[canonical] = input[key];
+                });
+
+                var defaults = tcNewSource();
+                Object.keys(defaults).forEach(function (key) {
+                    if (source[key] === undefined || source[key] === null) {
+                        source[key] = defaults[key];
+                    }
+                });
+
+                source.Headers = tcNormalizePairs(source.Headers);
+                source.JsonFields = tcNormalizePairs(source.JsonFields);
+
+                var domain = {};
+                var rawDomain = input.Domain || input.domain || {};
+                Object.keys(rawDomain).forEach(function (key) {
+                    var canonical = TC_DOMAIN_KEY_MAP[key.toLowerCase()] || key;
+                    domain[canonical] = rawDomain[key];
+                });
+                ['Provider', 'Url', 'Regex', 'DiscordBotToken', 'DiscordChannelId',
+                    'CacheMinutes', 'AutoApply'].forEach(function (key) {
+                    if (domain[key] === undefined || domain[key] === null) {
+                        domain[key] = defaults.Domain[key];
+                    }
+                });
+                source.Domain = domain;
+
+                if (!source.Id || source.Id === '00000000-0000-0000-0000-000000000000') {
+                    source.Id = tcNewId();
+                }
+
+                return source;
+            }
+
+            function tcNewId() {
+                if (window.crypto && crypto.randomUUID) {
+                    return crypto.randomUUID();
+                }
+
+                return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+                    var r = Math.random() * 16 | 0;
+                    return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+                });
+            }
+
+            function tcPage() { return document.querySelector('#TorrentConfigPage'); }
+
+            function tcFetch(path, options) {
+                var token = ApiClient.accessToken ? ApiClient.accessToken() : '';
+                var opts = options || {};
+                opts.headers = opts.headers || {};
+                opts.headers['Authorization'] = 'MediaBrowser Token="' + token + '"';
+                if (opts.body && typeof opts.body !== 'string') {
+                    opts.headers['Content-Type'] = 'application/json';
+                    opts.body = JSON.stringify(opts.body);
+                }
+                return fetch(ApiClient.getUrl(path), opts).then(function (response) {
+                    return response.text().then(function (text) {
+                        var data = null;
+                        try { data = text ? JSON.parse(text) : null; } catch (e) { data = null; }
+                        if (!response.ok) {
+                            throw new Error((data && data.error) || ('HTTP ' + response.status));
+                        }
+                        return data;
+                    });
+                });
+            }
+
+            function tcEscape(value) {
+                if (value === null || value === undefined) { return ''; }
+                return String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+            }
+
+            function tcStatus(message) {
+                var el = tcPage().querySelector('#tcSaveStatus');
+                if (el) { el.textContent = message || ''; }
+            }
+
+            function tcPairsToText(list) {
+                return (list || []).map(function (item) {
+                    return item.Name + ': ' + item.Value;
+                }).join('\n');
+            }
+
+            function tcTextToPairs(text) {
+                return (text || '').split(/\r?\n/).map(function (line) {
+                    var at = line.indexOf(':');
+                    if (at <= 0) { return null; }
+                    var name = line.substring(0, at).trim();
+                    var value = line.substring(at + 1).trim();
+                    return name ? { Name: name, Value: value } : null;
+                }).filter(function (x) { return x !== null; });
+            }
+
+            function tcValue(source, key) {
+                switch (key) {
+                    case 'Headers': return source.Headers || [];
+                    case 'JsonFields': return source.JsonFields || [];
+                    case 'DomainProvider': return source.Domain ? source.Domain.Provider : 'None';
+                    case 'DomainUrl': return source.Domain ? source.Domain.Url : '';
+                    case 'DomainRegex': return source.Domain ? source.Domain.Regex : '';
+                    case 'DiscordBotToken': return source.Domain ? source.Domain.DiscordBotToken : '';
+                    case 'DiscordChannelId': return source.Domain ? source.Domain.DiscordChannelId : '';
+                    case 'DomainCacheMinutes': return source.Domain ? source.Domain.CacheMinutes : 60;
+                    case 'DomainAutoApply': return source.Domain ? source.Domain.AutoApply : true;
+                    default: return source[key];
+                }
+            }
+
+            function tcSetValue(source, key, value) {
+                switch (key) {
+                    case 'Headers': source.Headers = value; return;
+                    case 'JsonFields': source.JsonFields = value; return;
+                    case 'DomainProvider': source.Domain.Provider = value; return;
+                    case 'DomainUrl': source.Domain.Url = value; return;
+                    case 'DomainRegex': source.Domain.Regex = value; return;
+                    case 'DiscordBotToken': source.Domain.DiscordBotToken = value; return;
+                    case 'DiscordChannelId': source.Domain.DiscordChannelId = value; return;
+                    case 'DomainCacheMinutes': source.Domain.CacheMinutes = parseInt(value, 10) || 60; return;
+                    case 'DomainAutoApply': source.Domain.AutoApply = !!value; return;
+                    default: source[key] = value;
+                }
+            }
+
+            function tcNewSource() {
+                return {
+                    Id: '00000000-0000-0000-0000-000000000000',
+                    Name: 'Nueva fuente',
+                    Enabled: true,
+                    Kind: 'Html',
+                    BaseUrl: '',
+                    SearchUrl: '{base}/search?q={query}',
+                    SearchMethod: 'Get',
+                    SearchBody: '',
+                    Headers: [],
+                    Cookie: '',
+                    MaxPages: 1,
+                    DelayMs: 300,
+                    FetchDetails: false,
+                    JsonFields: [],
+                    Domain: {
+                        Provider: 'None', Url: '', Regex: '', DiscordBotToken: '',
+                        DiscordChannelId: '', CacheMinutes: 60, AutoApply: true
+                    }
+                };
+            }
+
+            function tcRenderSources() {
+                var page = tcPage();
+                var list = page.querySelector('#tcSourcesList');
+                var sources = TC.config.Sources || [];
+
+                if (!sources.length) {
+                    list.innerHTML = '<div class="fieldDescription">Todavía no hay fuentes. Añade una plantilla o crea una desde cero.</div>';
+                    return;
+                }
+
+                list.innerHTML = sources.map(function (source, index) {
+                    return '<div class="tc-source' + (source.Enabled ? '' : ' off') + '" data-index="' + index + '">'
+                        + '<input is="emby-checkbox" type="checkbox" class="tc-toggle" ' + (source.Enabled ? 'checked' : '') + ' />'
+                        + '<div class="tc-name"><div>' + tcEscape(source.Name || '(sin nombre)') + '</div>'
+                        + '<small>' + tcEscape(source.Kind) + ' · ' + tcEscape(source.BaseUrl || 'sin URL')
+                        + ' · ' + (source.Domain && source.Domain.Provider !== 'None'
+                            ? 'dominio: ' + tcEscape(source.Domain.Provider) : 'dominio fijo') + '</small></div>'
+                        + '<button is="emby-button" type="button" class="raised tc-edit"><span>Editar</span></button>'
+                        + '<button is="emby-button" type="button" class="raised tc-up"><span>↑</span></button>'
+                        + '<button is="emby-button" type="button" class="raised tc-down"><span>↓</span></button>'
+                        + '<button is="emby-button" type="button" class="raised tc-delete"><span>Eliminar</span></button>'
+                        + '</div>';
+                }).join('');
+            }
+
+            function tcRenderEditor() {
+                var host = tcPage().querySelector('#tcEditorHost');
+                if (TC.editingIndex < 0) {
+                    host.innerHTML = '';
+                    return;
+                }
+
+                var source = TC.config.Sources[TC.editingIndex];
+                var html = '<div class="tc-editor"><div class="tc-editor-head">'
+                    + '<strong>Editar: ' + tcEscape(source.Name || '') + '</strong>'
+                    + '<div><button is="emby-button" type="button" class="raised" id="tcEditorTest"><span>Guardar y probar</span></button> '
+                    + '<button is="emby-button" type="button" class="raised" id="tcEditorDomain"><span>Resolver dominio</span></button> '
+                    + '<button is="emby-button" type="button" class="raised" id="tcEditorClose"><span>Cerrar</span></button></div>'
+                    + '</div>';
+
+                SECTIONS.forEach(function (section) {
+                    var fields = SOURCE_FIELDS.filter(function (field) { return field.section === section[0]; });
+                    html += '<details class="tc-group"' + (section[0] === 'basico' ? ' open' : '') + '>'
+                        + '<summary>' + section[1] + '</summary>';
+
+                    fields.forEach(function (field) {
+                        var value = tcValue(source, field.key);
+                        html += '<div class="tc-field"><label for="tcF_' + field.key + '">' + tcEscape(field.label) + '</label>';
+
+                        if (field.type === 'checkbox') {
+                            html += '<input type="checkbox" id="tcF_' + field.key + '" ' + (value ? 'checked' : '') + ' />';
+                        } else if (field.type === 'select') {
+                            html += '<select id="tcF_' + field.key + '">' + field.options.map(function (option) {
+                                return '<option value="' + option[0] + '"'
+                                    + (String(value) === option[0] ? ' selected' : '') + '>' + tcEscape(option[1]) + '</option>';
+                            }).join('') + '</select>';
+                        } else if (field.type === 'pairs') {
+                            html += '<textarea id="tcF_' + field.key + '" rows="4">'
+                                + tcEscape(tcPairsToText(value)) + '</textarea>';
+                        } else if (field.type === 'number') {
+                            html += '<input type="number" id="tcF_' + field.key + '" value="'
+                                + tcEscape(value === null || value === undefined ? '' : value) + '" />';
+                        } else {
+                            html += '<input type="text" id="tcF_' + field.key + '" value="'
+                                + tcEscape(value === null || value === undefined ? '' : value) + '" />';
+                        }
+
+                        if (field.hint) {
+                            html += '<div class="tc-hint">' + tcEscape(field.hint) + '</div>';
+                        }
+
+                        html += '</div>';
+                    });
+
+                    html += '</details>';
+                });
+
+                html += '<div class="tc-status" id="tcTestResult"></div>'
+                    + '<div class="tc-preview" id="tcTestPreview"></div></div>';
+                host.innerHTML = html;
+
+                host.querySelector('#tcEditorClose').addEventListener('click', function () {
+                    TC.editingIndex = -1;
+                    tcRenderEditor();
+                });
+
+                host.querySelector('#tcEditorTest').addEventListener('click', function () {
+                    tcReadEditor();
+                    tcSave().then(function () {
+                        tcRunTest();
+                    });
+                });
+
+                host.querySelector('#tcEditorDomain').addEventListener('click', function () {
+                    tcReadEditor();
+                    var status = host.querySelector('#tcTestResult');
+                    status.textContent = 'Resolviendo dominio…';
+                    tcSave().then(function () {
+                        return tcFetch('Torrent/api/domain/resolve', {
+                            method: 'POST',
+                            body: { sourceId: TC.config.Sources[TC.editingIndex].Id }
+                        });
+                    }).then(function (result) {
+                        if (result.ok) {
+                            TC.config.Sources[TC.editingIndex].BaseUrl = result.baseUrl;
+                            status.textContent = 'Dominio resuelto: ' + result.baseUrl;
+                            tcRenderEditor();
+                        } else {
+                            status.textContent = result.error || 'No se pudo resolver el dominio.';
+                        }
+                    }).catch(function (err) {
+                        status.textContent = 'Error: ' + err.message;
+                    });
+                });
+            }
+
+            function tcReadEditor() {
+                if (TC.editingIndex < 0) { return; }
+                var source = TC.config.Sources[TC.editingIndex];
+                SOURCE_FIELDS.forEach(function (field) {
+                    var element = document.querySelector('#tcF_' + field.key);
+                    if (!element) { return; }
+                    if (field.type === 'checkbox') {
+                        tcSetValue(source, field.key, element.checked);
+                    } else if (field.type === 'pairs') {
+                        tcSetValue(source, field.key, tcTextToPairs(element.value));
+                    } else if (field.type === 'number') {
+                        tcSetValue(source, field.key, parseInt(element.value, 10) || 0);
+                    } else {
+                        tcSetValue(source, field.key, element.value);
+                    }
+                });
+            }
+
+            function tcRunTest() {
+                var host = tcPage().querySelector('#tcEditorHost');
+                var status = host.querySelector('#tcTestResult');
+                var preview = host.querySelector('#tcTestPreview');
+                var source = TC.config.Sources[TC.editingIndex];
+                status.textContent = 'Consultando «matrix» en la fuente…';
+                preview.innerHTML = '';
+
+                tcFetch('Torrent/api/source/test', {
+                    method: 'POST',
+                    body: { sourceId: source.Id, query: 'matrix', fetchDetails: !!source.FetchDetails }
+                }).then(function (response) {
+                    var outcome = (response.sources || [])[0] || {};
+                    status.textContent = 'Resultados: ' + (response.results || []).length
+                        + ' · ' + (response.durationMs || 0) + ' ms'
+                        + (outcome.error ? '\nError: ' + outcome.error : '')
+                        + (outcome.diagnostic ? '\nDiagnóstico: ' + outcome.diagnostic : '');
+
+                    preview.innerHTML = (response.results || []).slice(0, 12).map(function (item) {
+                        return '<div class="tc-prev"><b>' + tcEscape(item.title || '') + '</b><br />'
+                            + tcEscape(item.releaseName || '') + '<br />'
+                            + (item.resolution ? tcEscape(item.resolution) + ' · ' : '')
+                            + (item.sizeText ? tcEscape(item.sizeText) + ' · ' : '')
+                            + (item.seeds !== null && item.seeds !== undefined ? '▲' + item.seeds + ' ' : '')
+                            + (item.magnet ? 'magnet ✓ ' : '')
+                            + (item.torrentUrl ? '.torrent ✓' : '') + '</div>';
+                    }).join('');
+                }).catch(function (err) {
+                    status.textContent = 'Error: ' + err.message;
+                });
+            }
+
+            function tcRenderTemplates() {
+                var page = tcPage();
+                var select = page.querySelector('#tcTemplateSelect');
+                var note = page.querySelector('#tcTemplateNote');
+
+                select.innerHTML = TC.templates.map(function (template, index) {
+                    return '<option value="' + index + '">' + tcEscape(template.name)
+                        + (template.verified ? ' ✓' : '') + '</option>';
+                }).join('');
+
+                function showNote() {
+                    var template = TC.templates[parseInt(select.value, 10)];
+                    if (!template) { note.textContent = ''; return; }
+                    note.textContent = (template.verified
+                        ? 'Plantilla comprobada. ' : 'Plantilla sin verificar: ajusta los selectores si no devuelve resultados. ')
+                        + (template.description || '');
+                }
+
+                select.addEventListener('change', showNote);
+                showNote();
+            }
+
+            function tcLoadConfig() {
+                Dashboard.showLoadingMsg();
+                return Promise.all([
+                    ApiClient.getPluginConfiguration(TorrentConfig.pluginUniqueId),
+                    tcFetch('Torrent/api/templates', { method: 'GET' }).catch(function () { return []; })
+                ]).then(function (results) {
+                    TC.config = results[0];
+                    TC.config.Sources = (TC.config.Sources || []).map(tcNormalizeSource);
+                    TC.config.BlockedKeywords = TC.config.BlockedKeywords || [];
+                    TC.templates = results[1] || [];
+                    TC.editingIndex = -1;
+                    tcFillGeneral();
+                    tcFillBrowser();
+                    tcFillClient();
+                    tcRenderSources();
+                    tcRenderEditor();
+                    tcRenderTemplates();
+                    Dashboard.hideLoadingMsg();
+                }).catch(function (err) {
+                    Dashboard.hideLoadingMsg();
+                    tcStatus('Error cargando la configuración: ' + err.message);
+                });
+            }
+
+            function tcFillGeneral() {
+                var page = tcPage();
+                var config = TC.config;
+                page.querySelector('#tcEnabled').checked = config.Enabled !== false;
+                page.querySelector('#tcProxyImages').checked = config.ProxyImages !== false;
+                page.querySelector('#tcTimeout').value = config.SearchTimeoutSeconds || 25;
+                page.querySelector('#tcMaxResults').value = config.MaxResultsPerSource || 60;
+                page.querySelector('#tcMinSeeds').value = config.MinSeeds || 0;
+                page.querySelector('#tcDetailLimit').value = config.DetailFetchLimit || 0;
+                page.querySelector('#tcCache').value = config.CacheMinutes || 0;
+                page.querySelector('#tcUserAgent').value = config.UserAgent || '';
+                page.querySelector('#tcBlocked').value = (config.BlockedKeywords || []).join('\n');
+            }
+
+            function tcFillBrowser() {
+                var page = tcPage();
+                var browser = TC.config.Browser || {};
+                page.querySelector('#tcBrowserMode').value = browser.Mode || 'Auto';
+                page.querySelector('#tcBrowserExe').value = browser.ExecutablePath || '';
+                page.querySelector('#tcBrowserFlare').value = browser.FlareSolverrUrl || '';
+                page.querySelector('#tcBrowserTimeout').value = browser.TimeoutSeconds || 45;
+                page.querySelector('#tcBrowserIdle').value = browser.IdleSeconds || 300;
+                page.querySelector('#tcBrowserUa').value = browser.UserAgent || '';
+                page.querySelector('#tcBrowserHeadless').checked = browser.Headless !== false;
+            }
+
+            function tcFillClient() {
+                var page = tcPage();
+                var client = TC.config.DownloadClient || {};
+                page.querySelector('#tcClientKind').value = client.Kind || 'Auto';
+                page.querySelector('#tcClientHost').value = client.Host || 'http://localhost';
+                page.querySelector('#tcClientPort').value = client.Port || 8080;
+                page.querySelector('#tcClientUser').value = client.Username || '';
+                page.querySelector('#tcClientPass').value = client.Password || '';
+                page.querySelector('#tcClientPath').value = client.SavePath || '';
+                page.querySelector('#tcClientCategory').value = client.Category || '';
+                page.querySelector('#tcClientTags').value = client.Tags || '';
+                page.querySelector('#tcClientPaused').checked = !!client.StartPaused;
+            }
+
+            function tcCollect() {
+                var page = tcPage();
+                var config = TC.config;
+
+                config.Enabled = page.querySelector('#tcEnabled').checked;
+                config.ProxyImages = page.querySelector('#tcProxyImages').checked;
+                config.SearchTimeoutSeconds = parseInt(page.querySelector('#tcTimeout').value, 10) || 25;
+                config.MaxResultsPerSource = parseInt(page.querySelector('#tcMaxResults').value, 10) || 60;
+                config.MinSeeds = parseInt(page.querySelector('#tcMinSeeds').value, 10) || 0;
+                config.DetailFetchLimit = parseInt(page.querySelector('#tcDetailLimit').value, 10) || 0;
+                config.CacheMinutes = parseInt(page.querySelector('#tcCache').value, 10) || 0;
+                config.UserAgent = page.querySelector('#tcUserAgent').value.trim();
+                config.BlockedKeywords = page.querySelector('#tcBlocked').value.split(/\r?\n/)
+                    .map(function (line) { return line.trim(); })
+                    .filter(function (line) { return line.length > 0; });
+
+                config.Browser = {
+                    Mode: page.querySelector('#tcBrowserMode').value,
+                    ExecutablePath: page.querySelector('#tcBrowserExe').value.trim(),
+                    FlareSolverrUrl: page.querySelector('#tcBrowserFlare').value.trim(),
+                    TimeoutSeconds: parseInt(page.querySelector('#tcBrowserTimeout').value, 10) || 45,
+                    Headless: page.querySelector('#tcBrowserHeadless').checked,
+                    IdleSeconds: parseInt(page.querySelector('#tcBrowserIdle').value, 10) || 300,
+                    UserAgent: page.querySelector('#tcBrowserUa').value.trim()
+                };
+
+                config.DownloadClient = {
+                    Kind: page.querySelector('#tcClientKind').value,
+                    Host: page.querySelector('#tcClientHost').value.trim() || 'http://localhost',
+                    Port: parseInt(page.querySelector('#tcClientPort').value, 10) || 8080,
+                    Username: page.querySelector('#tcClientUser').value,
+                    Password: page.querySelector('#tcClientPass').value,
+                    SavePath: page.querySelector('#tcClientPath').value.trim(),
+                    Category: page.querySelector('#tcClientCategory').value.trim(),
+                    Tags: page.querySelector('#tcClientTags').value.trim(),
+                    StartPaused: page.querySelector('#tcClientPaused').checked
+                };
+
+                return config;
+            }
+
+            function tcSave() {
+                var config = tcCollect();
+                tcStatus('Guardando…');
+                return ApiClient.updatePluginConfiguration(TorrentConfig.pluginUniqueId, config)
+                    .then(function (result) {
+                        Dashboard.processPluginConfigurationUpdateResult(result);
+                        tcStatus('Guardado.');
+                        return result;
+                    })
+                    .catch(function (err) {
+                        tcStatus('Error al guardar: ' + err.message);
+                        throw err;
+                    });
+            }
+
+            function tcBind() {
+                var page = tcPage();
+                if (!page || page.dataset.tcInit === '1') { return; }
+                page.dataset.tcInit = '1';
+
+                page.querySelectorAll('.tc-tab').forEach(function (tab) {
+                    tab.addEventListener('click', function () {
+                        page.querySelectorAll('.tc-tab').forEach(function (t) { t.classList.remove('on'); });
+                        page.querySelectorAll('.tc-pane').forEach(function (p) { p.classList.remove('on'); });
+                        tab.classList.add('on');
+                        var pane = page.querySelector('#tcPane' + tab.getAttribute('data-tab').charAt(0).toUpperCase()
+                            + tab.getAttribute('data-tab').slice(1));
+                        if (pane) { pane.classList.add('on'); }
+                    });
+                });
+
+                page.querySelector('#tcAddSource').addEventListener('click', function () {
+                    var source = tcNewSource();
+                    source.Id = tcNewId();
+                    TC.config.Sources.push(source);
+                    TC.editingIndex = TC.config.Sources.length - 1;
+                    tcRenderSources();
+                    tcRenderEditor();
+                });
+
+                page.querySelector('#tcAddTemplate').addEventListener('click', function () {
+                    var index = parseInt(page.querySelector('#tcTemplateSelect').value, 10);
+                    var template = TC.templates[index];
+                    if (!template) { return; }
+                    var copy = tcNormalizeSource(JSON.parse(JSON.stringify(template.source || {})));
+                    copy.Id = tcNewId();
+                    copy.Enabled = false;
+                    TC.config.Sources.push(copy);
+                    TC.editingIndex = TC.config.Sources.length - 1;
+                    tcRenderSources();
+                    tcRenderEditor();
+                    tcStatus('Plantilla añadida (desactivada). Revisa los selectores y actívala.');
+                });
+
+                page.querySelector('#tcSourcesList').addEventListener('click', function (event) {
+                    var row = event.target.closest('.tc-source');
+                    if (!row) { return; }
+                    var index = parseInt(row.getAttribute('data-index'), 10);
+                    var sources = TC.config.Sources;
+
+                    if (event.target.closest('.tc-edit')) {
+                        TC.editingIndex = index;
+                        tcRenderEditor();
+                        return;
+                    }
+
+                    if (event.target.closest('.tc-delete')) {
+                        if (window.confirm('¿Eliminar la fuente «' + (sources[index].Name || '') + '»?')) {
+                            sources.splice(index, 1);
+                            TC.editingIndex = -1;
+                            tcRenderSources();
+                            tcRenderEditor();
+                        }
+                        return;
+                    }
+
+                    if (event.target.closest('.tc-up') && index > 0) {
+                        var item = sources.splice(index, 1)[0];
+                        sources.splice(index - 1, 0, item);
+                        tcRenderSources();
+                        return;
+                    }
+
+                    if (event.target.closest('.tc-down') && index < sources.length - 1) {
+                        var moved = sources.splice(index, 1)[0];
+                        sources.splice(index + 1, 0, moved);
+                        tcRenderSources();
+                    }
+                });
+
+                page.querySelector('#tcSourcesList').addEventListener('change', function (event) {
+                    var row = event.target.closest('.tc-source');
+                    if (!row || !event.target.classList.contains('tc-toggle')) { return; }
+                    var index = parseInt(row.getAttribute('data-index'), 10);
+                    TC.config.Sources[index].Enabled = event.target.checked;
+                    row.classList.toggle('off', !event.target.checked);
+                });
+
+                page.querySelector('#tcOpenSearch').addEventListener('click', function () {
+                    if (typeof Dashboard !== 'undefined' && Dashboard.navigate) {
+                        Dashboard.navigate('configurationpage?name=TorrentSearch');
+                    } else {
+                        window.location.hash = '#/configurationpage?name=TorrentSearch';
+                    }
+                });
+
+                page.querySelector('#tcSave').addEventListener('click', function () {
+                    tcReadEditor();
+                    tcSave().catch(function () { /* estado ya mostrado */ });
+                });
+
+                page.querySelector('#tcBrowserProbe').addEventListener('click', function () {
+                    var target = page.querySelector('#tcBrowserResult');
+                    target.textContent = 'Comprobando…';
+                    tcSave().then(function () {
+                        return tcFetch('Torrent/api/browser/probe', { method: 'GET' });
+                    }).then(function (info) {
+                        target.innerHTML = (info.available
+                            ? '<span class="ok">✓</span> ' : '<span class="ko">✗</span> ')
+                            + tcEscape(info.message)
+                            + '<br />Motor: ' + tcEscape(info.mode)
+                            + (info.flareSolverrUrl ? ' · FlareSolverr: ' + tcEscape(info.flareSolverrUrl) : '');
+                    }).catch(function (err) {
+                        target.textContent = 'Error: ' + err.message;
+                    });
+                });
+
+                page.querySelector('#tcBrowserTest').addEventListener('click', function () {
+                    var target = page.querySelector('#tcBrowserResult');
+                    var url = page.querySelector('#tcBrowserTestUrl').value.trim();
+                    if (!url) {
+                        target.textContent = 'Escribe una URL para probar.';
+                        return;
+                    }
+
+                    target.textContent = 'Abriendo ' + url + '…';
+                    tcSave().then(function () {
+                        return tcFetch('Torrent/api/browser/test', {
+                            method: 'POST',
+                            body: { url: url, waitMs: 2000 }
+                        });
+                    }).then(function (result) {
+                        target.innerHTML = (result.ok
+                            ? '<span class="ok">✓</span> ' : '<span class="ko">✗</span> ')
+                            + 'motor: ' + tcEscape(result.engine || '-')
+                            + ' · ' + (result.htmlLength || 0) + ' bytes'
+                            + ' · ' + (result.hasCookies ? 'con cookies' : 'sin cookies')
+                            + (result.error ? '<br />Error: ' + tcEscape(result.error) : '')
+                            + '<br />Título: ' + tcEscape(result.title || '-')
+                            + '<br />URL final: ' + tcEscape(result.finalUrl || '-')
+                            + ((result.captured && result.captured.length)
+                                ? '<br />Capturadas: ' + result.captured.length
+                                : '');
+                    }).catch(function (err) {
+                        target.textContent = 'Error: ' + err.message;
+                    });
+                });
+
+                page.querySelector('#tcProbeClient').addEventListener('click', function () {
+                    var target = page.querySelector('#tcProbeResult');
+                    target.textContent = 'Probando…';
+                    tcSave().then(function () {
+                        return tcFetch('Torrent/api/client/probe', { method: 'GET' });
+                    }).then(function (probes) {
+                        target.innerHTML = (probes || []).map(function (probe) {
+                            return '<div>' + (probe.available
+                                ? '<span class="ok">✓</span> ' : '<span class="ko">✗</span> ')
+                                + tcEscape(probe.name) + (probe.available ? ' responde' : ' no responde')
+                                + '</div>';
+                        }).join('');
+                    }).catch(function (err) {
+                        target.textContent = 'Error: ' + err.message;
+                    });
+                });
+            }
+
+            (function () {
+                var page = tcPage();
+                if (!page) { return; }
+                page.addEventListener('pageshow', function () { tcBind(); tcLoadConfig(); });
+                page.addEventListener('viewshow', function () { tcBind(); tcLoadConfig(); });
+                setTimeout(function () { tcBind(); tcLoadConfig(); }, 400);
+            })();
+        </script>
+    </div>
+</body>
+
+</html>

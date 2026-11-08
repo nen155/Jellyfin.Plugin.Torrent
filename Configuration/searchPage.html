@@ -1,0 +1,782 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <title>Buscar torrents</title>
+</head>
+
+<body>
+    <div id="TorrentSearchPage" data-role="page" class="page type-interior pluginConfigurationPage"
+        data-require="emby-input,emby-button,emby-select,emby-checkbox">
+        <style>
+            #TorrentSearchPage .ts-row { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; }
+            #TorrentSearchPage .ts-row + .ts-row { margin-top: .5rem; }
+            #TorrentSearchPage .ts-query { flex: 1 1 320px; }
+            #TorrentSearchPage .ts-select { min-width: 130px; }
+            #TorrentSearchPage .ts-seeds { width: 110px; }
+            #TorrentSearchPage .ts-chip {
+                display: inline-flex; align-items: center; gap: .25rem; padding: .15rem .55rem;
+                border-radius: 999px; border: 1px solid rgba(127,127,127,.45); cursor: pointer;
+                font-size: .8rem; user-select: none; background: transparent; color: inherit;
+            }
+            #TorrentSearchPage .ts-chip.on { background: var(--theme-primary-color, #00a4dc); border-color: transparent; color: #fff; }
+            #TorrentSearchPage .ts-panel {
+                border: 1px solid rgba(127,127,127,.3); border-radius: 8px; padding: .75rem 1rem;
+                margin-top: .75rem; display: none;
+            }
+            #TorrentSearchPage .ts-panel.open { display: block; }
+            #TorrentSearchPage .ts-status { margin: .75rem 0 .25rem; font-size: .85rem; opacity: .85; }
+            #TorrentSearchPage .ts-sources { display: flex; flex-wrap: wrap; gap: .4rem; margin-top: .35rem; }
+            #TorrentSearchPage .ts-source-pill {
+                font-size: .75rem; padding: .1rem .45rem; border-radius: 4px;
+                background: rgba(127,127,127,.18);
+            }
+            #TorrentSearchPage .ts-source-pill.err { background: rgba(200,60,60,.25); }
+            #TorrentSearchPage .ts-grid {
+                display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr));
+                gap: .75rem; margin-top: .75rem;
+            }
+            #TorrentSearchPage .ts-card {
+                display: flex; gap: .7rem; padding: .7rem; border-radius: 8px;
+                background: rgba(127,127,127,.1); border: 1px solid rgba(127,127,127,.22);
+                min-height: 150px;
+            }
+            #TorrentSearchPage .ts-card:hover { border-color: var(--theme-primary-color, #00a4dc); }
+            #TorrentSearchPage .ts-poster {
+                width: 92px; height: 138px; flex: 0 0 92px; object-fit: cover;
+                border-radius: 6px; background: rgba(127,127,127,.2);
+            }
+            #TorrentSearchPage .ts-poster-ph {
+                width: 92px; height: 138px; flex: 0 0 92px; border-radius: 6px;
+                background: rgba(127,127,127,.15); display: flex; align-items: center;
+                justify-content: center; font-size: 1.8rem; opacity: .5;
+            }
+            #TorrentSearchPage .ts-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: .3rem; }
+            #TorrentSearchPage .ts-title { font-weight: 600; font-size: .98rem; line-height: 1.2; }
+            #TorrentSearchPage .ts-release {
+                font-size: .74rem; opacity: .65; overflow: hidden; text-overflow: ellipsis;
+                white-space: nowrap;
+            }
+            #TorrentSearchPage .ts-badges { display: flex; flex-wrap: wrap; gap: .25rem; }
+            #TorrentSearchPage .ts-badge {
+                font-size: .7rem; padding: .05rem .4rem; border-radius: 4px;
+                background: rgba(127,127,127,.22); white-space: nowrap;
+            }
+            #TorrentSearchPage .ts-badge.q { background: rgba(0,164,220,.28); }
+            #TorrentSearchPage .ts-badge.lang { background: rgba(90,180,90,.25); }
+            #TorrentSearchPage .ts-badge.hdr { background: rgba(190,120,220,.3); }
+            #TorrentSearchPage .ts-meta { font-size: .75rem; opacity: .8; display: flex; gap: .6rem; flex-wrap: wrap; }
+            #TorrentSearchPage .ts-seeds { color: #58c76a; }
+            #TorrentSearchPage .ts-leech { color: #d0736a; }
+            #TorrentSearchPage .ts-actions { display: flex; gap: .4rem; margin-top: auto; flex-wrap: wrap; }
+            #TorrentSearchPage .ts-actions button { font-size: .78rem; }
+            #TorrentSearchPage .ts-empty { padding: 2rem 0; text-align: center; opacity: .7; }
+            #TorrentSearchPage .ts-modal {
+                position: fixed; inset: 0; background: rgba(0,0,0,.6); z-index: 10000;
+                display: none; align-items: center; justify-content: center; padding: 1rem;
+            }
+            #TorrentSearchPage .ts-modal.open { display: flex; }
+            #TorrentSearchPage .ts-modal-box {
+                background: #1c1c1c; color: #eee; border-radius: 10px; max-width: 900px; width: 100%;
+                max-height: 90vh; overflow: auto; padding: 1rem 1.25rem;
+                box-shadow: 0 10px 40px rgba(0,0,0,.5);
+            }
+            #TorrentSearchPage .ts-modal-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; }
+            #TorrentSearchPage .ts-modal-title { font-size: 1.15rem; font-weight: 600; }
+            #TorrentSearchPage .ts-kv { display: grid; grid-template-columns: 130px 1fr; gap: .2rem .8rem; font-size: .85rem; }
+            #TorrentSearchPage .ts-kv dt { opacity: .6; }
+            #TorrentSearchPage .ts-kv dd { margin: 0; word-break: break-word; }
+            #TorrentSearchPage .ts-desc { font-size: .85rem; line-height: 1.45; margin-top: .75rem; opacity: .9; max-height: 220px; overflow: auto; }
+            #TorrentSearchPage .ts-files { font-size: .8rem; max-height: 240px; overflow: auto; margin-top: .5rem; }
+            #TorrentSearchPage .ts-files div { display: flex; justify-content: space-between; gap: 1rem; padding: .1rem 0; border-bottom: 1px solid rgba(127,127,127,.15); }
+            #TorrentSearchPage .ts-toast {
+                position: fixed; bottom: 1.5rem; left: 50%; transform: translateX(-50%);
+                background: #222; color: #fff; padding: .6rem 1rem; border-radius: 6px;
+                z-index: 10001; font-size: .85rem; max-width: 80vw; box-shadow: 0 6px 20px rgba(0,0,0,.4);
+            }
+            #TorrentSearchPage .ts-toast.err { background: #a33; }
+            #TorrentSearchPage .ts-toast.ok { background: #2a7a3a; }
+            @media (max-width: 600px) {
+                #TorrentSearchPage .ts-grid { grid-template-columns: 1fr; }
+            }
+        </style>
+
+        <div data-role="content">
+            <div class="content-primary">
+                <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:1rem;flex-wrap:wrap">
+                    <div>
+                        <h1 style="margin:0">Buscar torrents</h1>
+                        <div class="fieldDescription" id="tsClientInfo">Cargando configuración…</div>
+                    </div>
+                    <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+                        <button is="emby-button" type="button" id="tsConfigBtn" class="raised" style="display:none">
+                            <span>Configuración</span>
+                        </button>
+                        <button is="emby-button" type="button" id="tsManualBtn" class="raised">
+                            <span>Enlace manual</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="ts-row" style="margin-top:1rem">
+                    <input is="emby-input" type="search" id="tsQuery" class="ts-query"
+                        placeholder="Título de la película o serie…" autocomplete="off" />
+                    <button is="emby-button" type="button" id="tsSearchBtn" class="raised button-submit">
+                        <span>Buscar</span>
+                    </button>
+                </div>
+
+                <div class="ts-row">
+                    <select is="emby-select" id="tsType" class="ts-select">
+                        <option value="all">Todo</option>
+                        <option value="movie">Películas</option>
+                        <option value="series">Series</option>
+                    </select>
+                    <select is="emby-select" id="tsQuality" class="ts-select">
+                        <option value="">Cualquier calidad</option>
+                        <option value="2160p">2160p / 4K</option>
+                        <option value="1080p">1080p</option>
+                        <option value="720p">720p</option>
+                        <option value="480p">480p</option>
+                    </select>
+                    <input is="emby-input" type="number" id="tsMinSeeds" class="ts-seeds" min="0" step="1"
+                        placeholder="Seeds mín." />
+                    <select is="emby-select" id="tsSort" class="ts-select">
+                        <option value="seeds">Más seeds</option>
+                        <option value="relevance">Relevancia</option>
+                        <option value="date">Más recientes</option>
+                        <option value="size">Más grandes</option>
+                    </select>
+                    <button is="emby-button" type="button" id="tsSourcesBtn" class="raised">
+                        <span>Fuentes</span>
+                    </button>
+                </div>
+
+                <div class="ts-row" style="margin-top:.5rem">
+                    <span class="fieldDescription" style="margin:0">Idioma:</span>
+                    <span class="ts-chip" data-lang="es">Castellano</span>
+                    <span class="ts-chip" data-lang="es-419">Latino</span>
+                    <span class="ts-chip" data-lang="vose">VOSE</span>
+                    <span class="ts-chip" data-lang="multi">Multi</span>
+                    <span class="ts-chip" data-lang="en">Inglés</span>
+                </div>
+
+                <div class="ts-panel" id="tsSourcesPanel">
+                    <div class="fieldDescription">Fuentes a consultar (por defecto, todas las activas).</div>
+                    <div id="tsSourcesList" class="ts-sources" style="margin-top:.5rem"></div>
+                </div>
+
+                <div class="ts-status" id="tsStatus"></div>
+                <div class="ts-sources" id="tsOutcomes"></div>
+
+                <div class="ts-grid" id="tsGrid"></div>
+                <div class="ts-empty" id="tsEmpty">
+                    Escribe un título y pulsa Buscar. Los resultados se ordenan por seeds por defecto.
+                </div>
+            </div>
+        </div>
+
+        <div class="ts-modal" id="tsDetailsModal">
+            <div class="ts-modal-box" id="tsDetailsBox"></div>
+        </div>
+
+        <div class="ts-modal" id="tsManualModal">
+            <div class="ts-modal-box">
+                <div class="ts-modal-head">
+                    <div class="ts-modal-title">Enviar un enlace manualmente</div>
+                    <button is="emby-button" type="button" class="raised" data-close="tsManualModal">
+                        <span>Cerrar</span>
+                    </button>
+                </div>
+                <div class="fieldDescription">
+                    Pega uno o varios enlaces magnet (uno por línea) o la URL de un archivo .torrent.
+                </div>
+                <textarea id="tsManualText" rows="6" style="width:100%;margin-top:.5rem;padding:.5rem;border-radius:6px"></textarea>
+                <button is="emby-button" type="button" id="tsManualSend" class="raised button-submit" style="margin-top:.5rem">
+                    <span>Enviar al cliente</span>
+                </button>
+                <div class="fieldDescription" id="tsManualStatus"></div>
+            </div>
+        </div>
+
+        <script type="text/javascript">
+            var TS = {
+                config: null,
+                results: [],
+                selectedSources: [],
+                languages: [],
+                busy: false
+            };
+
+            var LANG_LABEL = {
+                'es': 'ES', 'es-419': 'LAT', 'vose': 'VOSE', 'multi': 'MULTI',
+                'en': 'EN', 'fr': 'FR', 'it': 'IT', 'de': 'DE', 'pt': 'PT',
+                'ru': 'RU', 'ja': 'JA', 'ko': 'KO', 'zh': 'ZH', 'hi': 'HI',
+                'ar': 'AR', 'tr': 'TR', 'pl': 'PL', 'nl': 'NL', 'sv': 'SV',
+                'da': 'DA', 'no': 'NO', 'fi': 'FI', 'cs': 'CS', 'hu': 'HU',
+                'ro': 'RO', 'el': 'EL', 'he': 'HE', 'uk': 'UK', 'ca': 'CA'
+            };
+
+            function tsPage() {
+                return document.querySelector('#TorrentSearchPage');
+            }
+
+            function tsFetch(path, options) {
+                if (typeof ApiClient === 'undefined') {
+                    return Promise.reject(new Error('ApiClient no disponible'));
+                }
+
+                var token = ApiClient.accessToken ? ApiClient.accessToken() : '';
+                var opts = options || {};
+                opts.headers = opts.headers || {};
+                opts.headers['Authorization'] = 'MediaBrowser Token="' + token + '"';
+                if (opts.body && typeof opts.body !== 'string') {
+                    opts.headers['Content-Type'] = 'application/json';
+                    opts.body = JSON.stringify(opts.body);
+                }
+                return fetch(ApiClient.getUrl(path), opts).then(function (response) {
+                    return response.text().then(function (text) {
+                        var data = null;
+                        try { data = text ? JSON.parse(text) : null; } catch (e) { data = null; }
+                        if (!response.ok) {
+                            throw new Error((data && data.error) || ('HTTP ' + response.status));
+                        }
+                        return data;
+                    });
+                });
+            }
+
+            function tsEscape(value) {
+                if (value === null || value === undefined) { return ''; }
+                return String(value)
+                    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+            }
+
+            function tsFormatSize(bytes) {
+                if (!bytes) { return ''; }
+                var units = ['B', 'KB', 'MB', 'GB', 'TB'];
+                var value = bytes;
+                var i = 0;
+                while (value >= 1024 && i < units.length - 1) { value /= 1024; i++; }
+                return (Math.round(value * 10) / 10) + ' ' + units[i];
+            }
+
+            function tsFormatDate(value) {
+                if (!value) { return ''; }
+                var date = new Date(value);
+                if (isNaN(date.getTime())) { return ''; }
+                return date.toLocaleDateString();
+            }
+
+            function tsToast(message, kind) {
+                var page = tsPage();
+                if (!page) { return; }
+                var old = page.querySelector('.ts-toast');
+                if (old) { old.remove(); }
+                var toast = document.createElement('div');
+                toast.className = 'ts-toast ' + (kind || '');
+                toast.textContent = message;
+                page.appendChild(toast);
+                setTimeout(function () { toast.remove(); }, 4500);
+            }
+
+            function tsPoster(item) {
+                if (!item.posterUrl) { return null; }
+                if (!TS.config || !TS.config.proxyImages) { return item.posterUrl; }
+                return ApiClient.getUrl('Torrent/api/image')
+                    + '?u=' + encodeURIComponent(item.posterUrl)
+                    + '&r=' + encodeURIComponent(item.detailUrl || '');
+            }
+
+            function tsLoadConfig() {
+                return tsFetch('Torrent/api/config', { method: 'GET' }).then(function (config) {
+                    TS.config = config;
+                    var page = tsPage();
+                    if (!page) { return; }
+                    page.querySelector('#tsClientInfo').textContent =
+                        (config.sources.length
+                            ? config.sources.filter(function (s) { return s.enabled; }).length
+                                + ' de ' + config.sources.length + ' fuentes activas'
+                            : 'No hay fuentes configuradas: añádelas en Panel → Plugins → Torrent Search')
+                        + ' · Cliente: ' + config.clientName;
+                    if (!page.querySelector('#tsMinSeeds').value) {
+                        page.querySelector('#tsMinSeeds').value = config.minSeeds || 0;
+                    }
+                    tsRenderSources(config.sources);
+                }).catch(function (err) {
+                    var info = tsPage().querySelector('#tsClientInfo');
+                    if (info) { info.textContent = 'No se pudo cargar la configuración: ' + err.message; }
+                });
+            }
+
+            function tsRenderSources(sources) {
+                var page = tsPage();
+                if (!page) { return; }
+                var container = page.querySelector('#tsSourcesList');
+                if (!sources || !sources.length) {
+                    container.innerHTML = '<span class="fieldDescription">Sin fuentes configuradas.</span>';
+                    return;
+                }
+
+                container.innerHTML = sources.filter(function (s) { return s.enabled; }).map(function (source) {
+                    return '<label class="ts-chip" data-source="' + source.id + '">'
+                        + tsEscape(source.name) + '</label>';
+                }).join('');
+            }
+
+            function tsSearch() {
+                if (TS.busy) { return; }
+                var page = tsPage();
+                var query = page.querySelector('#tsQuery').value.trim();
+                if (query.length < 2) {
+                    tsToast('Escribe al menos 2 caracteres.', 'err');
+                    return;
+                }
+
+                TS.busy = true;
+                page.querySelector('#tsSearchBtn').disabled = true;
+                page.querySelector('#tsStatus').textContent = 'Buscando «' + query + '»…';
+                page.querySelector('#tsOutcomes').innerHTML = '';
+                page.querySelector('#tsEmpty').style.display = 'none';
+                page.querySelector('#tsGrid').innerHTML = '';
+
+                var body = {
+                    query: query,
+                    sourceIds: TS.selectedSources,
+                    mediaType: page.querySelector('#tsType').value,
+                    quality: page.querySelector('#tsQuality').value,
+                    minSeeds: parseInt(page.querySelector('#tsMinSeeds').value, 10) || 0,
+                    sort: page.querySelector('#tsSort').value,
+                    languages: TS.languages
+                };
+
+                try {
+                    window.localStorage.setItem('torrentSearchQuery', query);
+                } catch (e) { /* sin almacenamiento */ }
+
+                tsFetch('Torrent/api/search', { method: 'POST', body: body })
+                    .then(function (response) {
+                        TS.results = response.results || [];
+                        tsRenderOutcomes(response);
+                        tsRenderResults();
+                        page.querySelector('#tsStatus').textContent =
+                            TS.results.length + ' resultado(s) de ' + (response.totalBeforeFilters || 0)
+                            + ' encontrados en ' + (response.durationMs || 0) + ' ms'
+                            + (response.cached ? ' (caché)' : '') + '.';
+                    })
+                    .catch(function (err) {
+                        page.querySelector('#tsStatus').textContent = 'Error: ' + err.message;
+                        tsToast(err.message, 'err');
+                    })
+                    .then(function () {
+                        TS.busy = false;
+                        page.querySelector('#tsSearchBtn').disabled = false;
+                    });
+            }
+
+            function tsRenderOutcomes(response) {
+                var container = tsPage().querySelector('#tsOutcomes');
+                var sources = response.sources || [];
+                if (!sources.length) {
+                    container.innerHTML = '';
+                    return;
+                }
+
+                container.innerHTML = sources.map(function (source) {
+                    var label = source.name + ' · ' + source.count;
+                    if (source.error) {
+                        label += ' · ' + source.error;
+                    }
+                    return '<span class="ts-source-pill' + (source.error ? ' err' : '') + '" title="'
+                        + tsEscape(source.error || source.baseUrl || '') + '">'
+                        + tsEscape(label) + '</span>';
+                }).join('');
+            }
+
+            function tsRenderResults() {
+                var page = tsPage();
+                var grid = page.querySelector('#tsGrid');
+                var empty = page.querySelector('#tsEmpty');
+
+                if (!TS.results.length) {
+                    grid.innerHTML = '';
+                    empty.style.display = '';
+                    empty.textContent = 'Sin resultados con estos filtros.';
+                    return;
+                }
+
+                empty.style.display = 'none';
+                grid.innerHTML = TS.results.map(function (item, index) {
+                    var poster = tsPoster(item);
+                    var badges = [];
+                    if (item.resolution) { badges.push('<span class="ts-badge q">' + tsEscape(item.resolution) + '</span>'); }
+                    if (item.isHdr) { badges.push('<span class="ts-badge hdr">HDR</span>'); }
+                    if (item.is3D) { badges.push('<span class="ts-badge">3D</span>'); }
+                    if (item.isRemux) { badges.push('<span class="ts-badge">REMUX</span>'); }
+                    if (item.medium) { badges.push('<span class="ts-badge">' + tsEscape(item.medium) + '</span>'); }
+                    if (item.videoCodec) { badges.push('<span class="ts-badge">' + tsEscape(item.videoCodec) + '</span>'); }
+                    if (item.audioCodec) {
+                        badges.push('<span class="ts-badge">' + tsEscape(item.audioCodec)
+                            + (item.audioChannels ? ' ' + tsEscape(item.audioChannels) : '') + '</span>');
+                    }
+                    (item.languages || []).forEach(function (lang) {
+                        badges.push('<span class="ts-badge lang">' + tsEscape(LANG_LABEL[lang] || lang.toUpperCase()) + '</span>');
+                    });
+                    if (item.episodeText) { badges.push('<span class="ts-badge">' + tsEscape(item.episodeText) + '</span>'); }
+
+                    var title = item.title || item.releaseName || '(sin título)';
+                    if (item.year) { title += ' (' + item.year + ')'; }
+
+                    return '<div class="ts-card" data-index="' + index + '">'
+                        + (poster
+                            ? '<img class="ts-poster" loading="lazy" src="' + tsEscape(poster) + '" alt="" onerror="this.style.visibility=\'hidden\'" />'
+                            : '<div class="ts-poster-ph">🎞</div>')
+                        + '<div class="ts-body">'
+                        + '<div class="ts-title">' + tsEscape(title) + '</div>'
+                        + '<div class="ts-release" title="' + tsEscape(item.releaseName || '') + '">'
+                        + tsEscape(item.releaseName || '') + '</div>'
+                        + '<div class="ts-badges">' + badges.join('') + '</div>'
+                        + '<div class="ts-meta">'
+                        + (item.sizeText || item.sizeBytes
+                            ? '<span>' + tsEscape(item.sizeText || tsFormatSize(item.sizeBytes)) + '</span>' : '')
+                        + (item.runtimeMinutes ? '<span>' + item.runtimeMinutes + ' min</span>' : '')
+                        + (item.seeds !== null && item.seeds !== undefined
+                            ? '<span class="ts-seeds">▲ ' + item.seeds + '</span>' : '')
+                        + (item.leeches !== null && item.leeches !== undefined
+                            ? '<span class="ts-leech">▼ ' + item.leeches + '</span>' : '')
+                        + (item.published ? '<span>' + tsEscape(tsFormatDate(item.published)) + '</span>' : '')
+                        + '<span>' + tsEscape(item.sourceName || '') + '</span>'
+                        + '</div>'
+                        + '<div class="ts-actions">'
+                        + '<button is="emby-button" type="button" class="raised ts-download" data-index="' + index + '">'
+                        + '<span>' + (item.hasLink ? 'Descargar' : 'Sin enlace') + '</span></button>'
+                        + '<button is="emby-button" type="button" class="raised ts-details" data-index="' + index + '">'
+                        + '<span>Más info</span></button>'
+                        + '</div>'
+                        + '</div></div>';
+                }).join('');
+            }
+
+            function tsFindItem(index) {
+                var i = parseInt(index, 10);
+                return isNaN(i) ? null : TS.results[i];
+            }
+
+            function tsSendToClient(item) {
+                if (!item) { return; }
+                if (!item.hasLink) {
+                    tsToast('Este resultado no tiene enlace magnet ni .torrent.', 'err');
+                    return;
+                }
+
+                tsToast('Enviando al cliente…');
+                tsFetch('Torrent/api/add', {
+                    method: 'POST',
+                    body: {
+                        resultId: item.id,
+                        magnet: item.magnet,
+                        torrentUrl: item.torrentUrl,
+                        title: item.releaseName || item.title,
+                        referer: item.detailUrl
+                    }
+                }).then(function (result) {
+                    if (result.fallback) {
+                        tsToast(result.message || 'Abriendo el enlace con tu cliente…');
+                        var link = result.magnet || result.torrentUrl;
+                        if (link) {
+                            window.location.href = link;
+                        }
+                        return;
+                    }
+
+                    tsToast(result.message || 'Enviado.', result.success ? 'ok' : 'err');
+                }).catch(function (err) {
+                    tsToast('No se pudo enviar: ' + err.message, 'err');
+                });
+            }
+
+            function tsOpenDetails(item) {
+                if (!item) { return; }
+                var page = tsPage();
+                var box = page.querySelector('#tsDetailsBox');
+                var poster = tsPoster(item);
+
+                var rows = [];
+                function add(label, value) {
+                    if (value === null || value === undefined || value === '') { return; }
+                    rows.push('<dt>' + tsEscape(label) + '</dt><dd>' + tsEscape(value) + '</dd>');
+                }
+
+                add('Título', item.title);
+                add('Año', item.year);
+                add('Tipo', item.kind === 'series' ? 'Serie' : (item.kind === 'movie' ? 'Película' : ''));
+                add('Episodio', item.episodeText);
+                add('Release', item.releaseName);
+                add('Idiomas', item.languageText || (item.languages || []).map(function (l) {
+                    return LANG_LABEL[l] || l;
+                }).join(', '));
+                add('Resolución', item.resolution);
+                add('Fuente', item.medium);
+                add('Vídeo', item.videoCodec);
+                add('Audio', (item.audioCodec || '') + (item.audioChannels ? ' ' + item.audioChannels : ''));
+                add('Contenedor', item.container);
+                add('Grupo', item.releaseGroup);
+                add('HDR', item.isHdr ? 'Sí' : '');
+                add('3D', item.is3D ? 'Sí' : '');
+                add('Remux', item.isRemux ? 'Sí' : '');
+                add('Tamaño', item.sizeText || tsFormatSize(item.sizeBytes));
+                add('Duración', item.runtimeMinutes ? item.runtimeMinutes + ' min' : '');
+                add('Semillas', item.seeds);
+                add('Clientes', item.leeches);
+                add('Completados', item.completed);
+                add('Publicado', item.published ? tsFormatDate(item.published) : item.publishedText);
+                add('Categoría', item.category);
+                add('Web', item.sourceName);
+                add('Info-hash', item.infoHash);
+                (item.extra || []).forEach(function (pair) { add(pair.name, pair.value); });
+
+                var actions = '<div class="ts-actions" style="margin-top:.75rem">'
+                    + (item.hasLink
+                        ? '<button is="emby-button" type="button" class="raised button-submit" id="tsDetailSend"><span>Enviar al cliente</span></button>'
+                        : '')
+                    + (item.magnet
+                        ? '<button is="emby-button" type="button" class="raised" id="tsDetailMagnet"><span>Abrir magnet</span></button>'
+                        : '')
+                    + (item.torrentUrl
+                        ? '<a is="emby-button" class="raised" target="_blank" rel="noopener" href="'
+                            + tsEscape(ApiClient.getUrl('Torrent/api/torrent')
+                                + '?u=' + encodeURIComponent(item.torrentUrl)
+                                + '&r=' + encodeURIComponent(item.detailUrl || '')
+                                + '&name=' + encodeURIComponent(item.title || 'torrent'))
+                            + '"><span>Descargar .torrent</span></a>'
+                        : '')
+                    + (item.torrentUrl
+                        ? '<button is="emby-button" type="button" class="raised" id="tsDetailFiles"><span>Ver archivos</span></button>'
+                        : '')
+                    + (item.detailUrl
+                        ? '<a is="emby-button" class="raised" target="_blank" rel="noopener" href="'
+                            + tsEscape(item.detailUrl) + '"><span>Abrir ficha</span></a>'
+                        : '')
+                    + '</div>';
+
+                box.innerHTML = '<div class="ts-modal-head">'
+                    + '<div>'
+                    + '<div class="ts-modal-title">' + tsEscape((item.title || '') + (item.year ? ' (' + item.year + ')' : '')) + '</div>'
+                    + '<div class="ts-release">' + tsEscape(item.releaseName || '') + '</div>'
+                    + '</div>'
+                    + '<button is="emby-button" type="button" class="raised" data-close="tsDetailsModal"><span>Cerrar</span></button>'
+                    + '</div>'
+                    + '<div style="display:flex;gap:1rem;margin-top:.75rem;align-items:flex-start">'
+                    + (poster ? '<img src="' + tsEscape(poster) + '" alt="" style="width:150px;border-radius:8px" />' : '')
+                    + '<dl class="ts-kv" style="flex:1">' + rows.join('') + '</dl>'
+                    + '</div>'
+                    + (item.description ? '<div class="ts-desc">' + tsEscape(item.description) + '</div>' : '')
+                    + actions
+                    + '<div id="tsDetailFilesBox"></div>';
+
+                page.querySelector('#tsDetailsModal').classList.add('open');
+
+                var magnetBtn = box.querySelector('#tsDetailMagnet');
+                if (magnetBtn) {
+                    magnetBtn.addEventListener('click', function () {
+                        window.location.href = item.magnet;
+                    });
+                }
+
+                var sendBtn = box.querySelector('#tsDetailSend');
+                if (sendBtn) {
+                    sendBtn.addEventListener('click', function () { tsSendToClient(item); });
+                }
+
+                var filesBtn = box.querySelector('#tsDetailFiles');
+                if (filesBtn) {
+                    filesBtn.addEventListener('click', function () {
+                        filesBtn.disabled = true;
+                        var target = box.querySelector('#tsDetailFilesBox');
+                        target.innerHTML = '<div class="fieldDescription">Leyendo el .torrent…</div>';
+                        tsFetch('Torrent/api/files?u=' + encodeURIComponent(item.torrentUrl)
+                            + '&r=' + encodeURIComponent(item.detailUrl || ''), { method: 'GET' })
+                            .then(function (info) {
+                                var files = (info.files || []).map(function (file) {
+                                    return '<div><span>' + tsEscape(file.path) + '</span><span>'
+                                        + tsEscape(tsFormatSize(file.size)) + '</span></div>';
+                                }).join('');
+                                target.innerHTML = '<div class="fieldDescription" style="margin-top:.5rem">'
+                                    + 'Nombre: ' + tsEscape(info.name) + ' · ' + tsEscape(tsFormatSize(info.totalSize))
+                                    + ' · ' + (info.files || []).length + ' archivo(s)</div>'
+                                    + '<div class="ts-files">' + files + '</div>';
+                            })
+                            .catch(function (err) {
+                                target.innerHTML = '<div class="fieldDescription">No se pudo leer: '
+                                    + tsEscape(err.message) + '</div>';
+                            })
+                            .then(function () { filesBtn.disabled = false; });
+                    });
+                }
+            }
+
+            function tsManualSend() {
+                var page = tsPage();
+                var text = page.querySelector('#tsManualText').value;
+                var status = page.querySelector('#tsManualStatus');
+                var lines = text.split(/\r?\n/).map(function (l) { return l.trim(); })
+                    .filter(function (l) { return l.length > 0; });
+
+                if (!lines.length) {
+                    status.textContent = 'Pega al menos un enlace.';
+                    return;
+                }
+
+                status.textContent = 'Enviando ' + lines.length + ' enlace(s)…';
+                var chain = Promise.resolve();
+                var sent = 0;
+                lines.forEach(function (line) {
+                    chain = chain.then(function () {
+                        var isMagnet = line.toLowerCase().indexOf('magnet:') === 0;
+                        return tsFetch('Torrent/api/add', {
+                            method: 'POST',
+                            body: {
+                                magnet: isMagnet ? line : null,
+                                torrentUrl: isMagnet ? null : line,
+                                title: 'manual'
+                            }
+                        }).then(function (result) {
+                            if (result.success) { sent++; }
+                            if (result.fallback) {
+                                window.open(result.magnet || result.torrentUrl, '_blank');
+                            }
+                        });
+                    });
+                });
+
+                chain.then(function () {
+                    status.textContent = sent + ' de ' + lines.length + ' enlace(s) enviados al cliente.';
+                }).catch(function (err) {
+                    status.textContent = 'Error: ' + err.message;
+                });
+            }
+
+            function tsInit() {
+                var page = tsPage();
+                if (!page || page.dataset.tsInit === '1') { return; }
+                page.dataset.tsInit = '1';
+
+                page.querySelector('#tsSearchBtn').addEventListener('click', tsSearch);
+                page.querySelector('#tsQuery').addEventListener('keydown', function (event) {
+                    if (event.key === 'Enter') {
+                        event.preventDefault();
+                        tsSearch();
+                    }
+                });
+
+                page.querySelector('#tsSourcesBtn').addEventListener('click', function () {
+                    page.querySelector('#tsSourcesPanel').classList.toggle('open');
+                });
+
+                page.querySelector('#tsSourcesList').addEventListener('click', function (event) {
+                    var chip = event.target.closest('.ts-chip');
+                    if (!chip) { return; }
+                    var id = chip.getAttribute('data-source');
+                    var index = TS.selectedSources.indexOf(id);
+                    if (index >= 0) {
+                        TS.selectedSources.splice(index, 1);
+                        chip.classList.remove('on');
+                    } else {
+                        TS.selectedSources.push(id);
+                        chip.classList.add('on');
+                    }
+                });
+
+                page.addEventListener('click', function (event) {
+                    var langChip = event.target.closest('.ts-chip[data-lang]');
+                    if (langChip) {
+                        var lang = langChip.getAttribute('data-lang');
+                        var at = TS.languages.indexOf(lang);
+                        if (at >= 0) {
+                            TS.languages.splice(at, 1);
+                            langChip.classList.remove('on');
+                        } else {
+                            TS.languages.push(lang);
+                            langChip.classList.add('on');
+                        }
+                        return;
+                    }
+
+                    var download = event.target.closest('.ts-download');
+                    if (download) {
+                        tsSendToClient(tsFindItem(download.getAttribute('data-index')));
+                        return;
+                    }
+
+                    var details = event.target.closest('.ts-details');
+                    if (details) {
+                        tsOpenDetails(tsFindItem(details.getAttribute('data-index')));
+                        return;
+                    }
+
+                    var close = event.target.closest('[data-close]');
+                    if (close) {
+                        var modal = page.querySelector('#' + close.getAttribute('data-close'));
+                        if (modal) { modal.classList.remove('open'); }
+                        return;
+                    }
+
+                    if (event.target.classList && event.target.classList.contains('ts-modal')) {
+                        event.target.classList.remove('open');
+                    }
+                });
+
+                page.querySelector('#tsManualBtn').addEventListener('click', function () {
+                    page.querySelector('#tsManualModal').classList.add('open');
+                });
+
+                page.querySelector('#tsManualSend').addEventListener('click', tsManualSend);
+
+                var stored = '';
+                try { stored = window.localStorage.getItem('torrentSearchQuery') || ''; } catch (e) { stored = ''; }
+                if (stored) {
+                    page.querySelector('#tsQuery').value = stored;
+                }
+
+                page.querySelector('#tsConfigBtn').addEventListener('click', function () {
+                    if (typeof Dashboard !== 'undefined' && Dashboard.navigate) {
+                        Dashboard.navigate('configurationpage?name=TorrentSearchConfig');
+                    } else {
+                        window.location.hash = '#/configurationpage?name=TorrentSearchConfig';
+                    }
+                });
+
+                if (typeof ApiClient !== 'undefined' && ApiClient.getCurrentUser) {
+                    ApiClient.getCurrentUser().then(function (user) {
+                        if (user && user.Policy && user.Policy.IsAdministrator) {
+                            page.querySelector('#tsConfigBtn').style.display = '';
+                        }
+                    }).catch(function () { /* sin sesión de usuario */ });
+                }
+
+                tsLoadConfig();
+            }
+
+            function tsOnShow() {
+                var page = tsPage();
+                if (!page) { return; }
+                var first = page.dataset.tsInit !== '1';
+                tsInit();
+                if (!first) {
+                    tsLoadConfig();
+                }
+            }
+
+            (function () {
+                var page = tsPage();
+                if (!page) { return; }
+                page.addEventListener('pageshow', tsOnShow);
+                page.addEventListener('viewshow', tsOnShow);
+                setTimeout(tsInit, 400);
+            })();
+        </script>
+    </div>
+</body>
+
+</html>
