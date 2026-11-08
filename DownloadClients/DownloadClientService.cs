@@ -140,14 +140,15 @@ public sealed class DownloadClientService
 
         foreach (var client in _clients)
         {
-            var available = await client
+            var probe = await client
                 .ProbeAsync(config, cancellationToken)
                 .ConfigureAwait(false);
             probes.Add(new ClientProbe
             {
                 Kind = client.Kind.ToString(),
                 Name = client.DisplayName,
-                Available = available
+                Available = probe.Available,
+                Message = probe.Message
             });
         }
 
@@ -165,13 +166,13 @@ public sealed class DownloadClientService
             return true;
         }
 
-        var available = await client.ProbeAsync(config, cancellationToken).ConfigureAwait(false);
-        if (available)
+        var probe = await client.ProbeAsync(config, cancellationToken).ConfigureAwait(false);
+        if (probe.Available)
         {
             _available[key] = DateTimeOffset.UtcNow.Add(ProbeTtl);
         }
 
-        return available;
+        return probe.Available;
     }
 
     private static string BuildFileName(string? title)
@@ -204,4 +205,7 @@ public sealed class ClientProbe
 
     /// <summary>Gets or sets a value indicating whether responde.</summary>
     public bool Available { get; set; }
+
+    /// <summary>Gets or sets el detalle del estado.</summary>
+    public string Message { get; set; } = string.Empty;
 }

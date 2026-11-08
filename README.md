@@ -32,8 +32,13 @@ retos anti-bot y pulsar los botones de descarga protegidos.
   sube al cliente como archivo.
 - **Resolución automática de dominio** (página HTTP o canal de Discord con bot).
 - **Fuentes Torznab** (Jackett, Prowlarr, trackers con API compatible).
+- **Análisis automático de una web**: pega su URL y el plugin detecta el
+  formulario de búsqueda (GET o POST), la lista de resultados, el título, el
+  enlace, los magnet/.torrent, el tamaño, el idioma y la ficha. Si la lista no
+  pinta resultados por HTTP, reintenta con el navegador.
 - **Plantillas** listas: Nyaa, WatchSoMuch, DonTorrent, 1337x, YTS, Torznab,
-  genérica HTML y genérica JSON.
+  genérica HTML y genérica JSON. **WatchSoMuch y DonTorrent vienen ya
+  configuradas y activadas** de fábrica.
 
 ## Instalación
 
@@ -70,6 +75,15 @@ Páginas disponibles:
 
 Los selectores admiten **`selector@atributo`** (`img@src`, `a@href`). Si `src`
 está vacío se prueban `data-src`, `data-original` y `data-lazy-src`.
+
+### Añadir una fuente a partir de su URL
+
+En **Fuentes**, escribe la URL de la web y pulsa **Analizar URL**. El plugin
+abre la web, busca el formulario de búsqueda, ejecuta una búsqueda de prueba con
+"matrix", reconoce la lista de resultados y rellena el editor con lo detectado
+(incluido el motor HTTP o navegador). El resumen indica si la detección es
+*fiable* o *a revisar*, y los avisos explican qué falta (semillas, enlaces en la
+ficha, etc.). Después puedes ajustar los selectores y usar **Guardar y probar**.
 
 ### Cuando la web necesita JavaScript
 
@@ -123,7 +137,18 @@ tras el tiempo de inactividad. No requiere instalar nada más que Chrome/Edge.
 | Solo enlace magnet | — | Abre el `magnet:` con el programa del sistema |
 
 Opciones: carpeta de descarga, categoría y etiquetas (qBittorrent) y añadir en
-pausa. **«Probar conexión»** indica qué clientes responden.
+pausa. **«Probar conexión»** indica qué clientes responden y, si fallan, el
+motivo exacto.
+
+Notas para qBittorrent:
+
+- El **WebUI tiene que estar activado** y su puerto **libre**. Si otro programa
+  ocupa el puerto, qBittorrent no puede abrirlo y el plugin recibirá un 404 de
+  ese otro servicio (es lo que ocurre cuando el 8080 lo usa Docker).
+- El plugin guarda la cookie de sesión aunque venga marcada `Secure` y envía
+  `Referer`/`Origin` en todas las peticiones (protección CSRF).
+- Si el WebUI exige autenticación local, pon usuario y contraseña en el plugin
+  o activa «Bypass authentication for clients on localhost» en qBittorrent.
 
 Al pulsar **Descargar**:
 

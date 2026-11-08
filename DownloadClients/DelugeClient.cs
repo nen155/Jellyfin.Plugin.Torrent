@@ -40,11 +40,18 @@ public sealed class DelugeClient : IDownloadClient, IDisposable
     public string DisplayName => "Deluge";
 
     /// <inheritdoc />
-    public async Task<bool> ProbeAsync(DownloadClientConfig config, CancellationToken cancellationToken)
+    public async Task<ProbeResult> ProbeAsync(DownloadClientConfig config, CancellationToken cancellationToken)
     {
         try
         {
-            return await LoginAsync(config, cancellationToken).ConfigureAwait(false);
+            var ok = await LoginAsync(config, cancellationToken).ConfigureAwait(false);
+            return new ProbeResult
+            {
+                Available = ok,
+                Message = ok
+                    ? "Deluge conectado."
+                    : "Deluge rechazó el inicio de sesión (revisa la contraseña del Web UI)."
+            };
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -53,7 +60,7 @@ public sealed class DelugeClient : IDownloadClient, IDisposable
         catch (Exception ex)
         {
             _logger.LogDebug(ex, "Torrent: Deluge no responde");
-            return false;
+            return new ProbeResult { Available = false, Message = "No hay conexión con Deluge: " + ex.Message };
         }
     }
 

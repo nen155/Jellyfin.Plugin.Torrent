@@ -23,7 +23,12 @@ public class PluginConfiguration : BasePluginConfiguration
         DetailFetchLimit = 12;
         BlockedKeywords = new List<string>();
         Sources = new List<Models.TorrentSourceConfig>();
-        DownloadClient = new Models.DownloadClientConfig();
+        DownloadClient = new Models.DownloadClientConfig
+        {
+            Kind = Models.DownloadClientKind.Auto,
+            Host = "http://127.0.0.1",
+            Port = 8081
+        };
         Browser = new Models.BrowserConfig();
     }
 
@@ -68,4 +73,34 @@ public class PluginConfiguration : BasePluginConfiguration
 
     /// <summary>Gets or sets la configuración del navegador headless.</summary>
     public Models.BrowserConfig Browser { get; set; }
+
+    /// <summary>
+    /// Fuentes que se añaden la primera vez (WatchSoMuch y DonTorrent), con
+    /// identificadores fijos para que no cambien entre reinicios.
+    /// </summary>
+    /// <returns>Fuentes activadas.</returns>
+    public static List<Models.TorrentSourceConfig> CreateDefaultSources()
+    {
+        var defaults = new Dictionary<string, Guid>(StringComparer.Ordinal)
+        {
+            ["watchsomuch"] = Guid.Parse("7a3f1c92-5b6e-4d21-9c8a-1e4f7b2d6a01"),
+            ["dontorrent"] = Guid.Parse("4d8e2b71-9a3c-4f65-8b1d-2c7e9a5f3b02")
+        };
+
+        var sources = new List<Models.TorrentSourceConfig>();
+        foreach (var template in Services.SourceTemplates.All())
+        {
+            if (!defaults.TryGetValue(template.Key, out var id))
+            {
+                continue;
+            }
+
+            var source = template.Source.Clone();
+            source.Id = id;
+            source.Enabled = true;
+            sources.Add(source);
+        }
+
+        return sources;
+    }
 }

@@ -23,6 +23,15 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
         : base(applicationPaths, xmlSerializer)
     {
         Instance = this;
+
+        // XmlSerializer ejecuta el constructor y luego AÑADE los elementos a la
+        // lista, así que las fuentes por defecto se crean aquí, solo cuando no
+        // hay ninguna guardada.
+        if (Configuration.Sources.Count == 0)
+        {
+            Configuration.Sources.AddRange(PluginConfiguration.CreateDefaultSources());
+            SaveConfiguration();
+        }
     }
 
     /// <summary>

@@ -41,6 +41,7 @@ public class TorrentMiddleware
     private readonly DomainResolverService _domains;
     private readonly SessionStore _sessions;
     private readonly PageLoader _pages;
+    private readonly SourceDiscoveryService _discovery;
     private readonly ILogger<TorrentMiddleware> _logger;
 
     /// <summary>
@@ -54,6 +55,7 @@ public class TorrentMiddleware
     /// <param name="domains">Resolutor de dominios.</param>
     /// <param name="sessions">Almacén de sesiones del navegador.</param>
     /// <param name="pages">Cargador de páginas (para probar el navegador).</param>
+    /// <param name="discovery">Servicio de análisis de webs.</param>
     /// <param name="logger">Logger.</param>
     public TorrentMiddleware(
         RequestDelegate next,
@@ -64,6 +66,7 @@ public class TorrentMiddleware
         DomainResolverService domains,
         SessionStore sessions,
         PageLoader pages,
+        SourceDiscoveryService discovery,
         ILogger<TorrentMiddleware> logger)
     {
         _next = next;
@@ -74,6 +77,7 @@ public class TorrentMiddleware
         _domains = domains;
         _sessions = sessions;
         _pages = pages;
+        _discovery = discovery;
         _logger = logger;
     }
 
@@ -169,6 +173,16 @@ public class TorrentMiddleware
                     }
 
                     await HandleDomainResolve(context).ConfigureAwait(false);
+                    return;
+
+                case "/api/source/discover" when HttpMethods.IsPost(context.Request.Method):
+                    if (!isAdmin)
+                    {
+                        await DenyAdmin(context).ConfigureAwait(false);
+                        return;
+                    }
+
+                    await HandleDiscover(context).ConfigureAwait(false);
                     return;
 
                 case "/api/browser/probe" when HttpMethods.IsGet(context.Request.Method):
@@ -403,6 +417,24 @@ public class TorrentMiddleware
             .TestSourceAsync(request.SourceId, query, request.FetchDetails, context.RequestAborted)
             .ConfigureAwait(false);
         await WriteJson(context, response).ConfigureAwait(false);
+    }
+
+    private async Task HandleDiscover(HttpContext context)
+    {
+        var request = await ReadBodyAsync<DiscoverRequest>(context).ConfigureAwait(false);
+        if (request is null || string.IsNullOrWhiteSpace(request.Url))
+        {
+            context.Response.StatusCode = StatusCodes.Status400BadRequest;
+            await WriteJson(context, new { error = "Falta la URL de la web." }).ConfigureAwait(false);
+            return;
+        }
+
+        var query = string.IsNullOrWhiteSpace(request.Query) ? "matrix" : request.Query;
+        var result = await _discovery
+            .DiscoverAsync(request.Url, query, context.RequestAborted)
+            .ConfigureAwait(false);
+
+        await WriteJson(context, result).ConfigureAwait(false);
     }
 
     private async Task HandleBrowserProbe(HttpContext context)

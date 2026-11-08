@@ -29,16 +29,12 @@
             #TorrentConfigPage .tc-group summary { cursor: pointer; font-weight: 600; padding: .35rem 0; }
             #TorrentConfigPage .tc-field { margin: .5rem 0; }
             #TorrentConfigPage .tc-field label { display: block; font-size: .82rem; opacity: .8; margin-bottom: .15rem; }
-            #TorrentConfigPage .tc-field input[type=text], #TorrentConfigPage .tc-field input[type=number],
-            #TorrentConfigPage .tc-field input[type=password], #TorrentConfigPage .tc-field textarea,
-            #TorrentConfigPage .tc-field select {
-                width: 100%; padding: .4rem .5rem; border-radius: 6px; border: 1px solid rgba(127,127,127,.45);
-                background: rgba(127,127,127,.08); color: inherit; font-size: .88rem; box-sizing: border-box;
-            }
             #TorrentConfigPage .tc-field textarea { font-family: monospace; font-size: .8rem; }
             #TorrentConfigPage .tc-hint { font-size: .75rem; opacity: .6; margin-top: .15rem; }
             #TorrentConfigPage .tc-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem 1rem; }
             #TorrentConfigPage .tc-row { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; margin: .5rem 0; }
+            #TorrentConfigPage .tc-row > input, #TorrentConfigPage .tc-row > select { width: auto; flex: 1 1 240px; }
+            #TorrentConfigPage .tc-row > button { flex: 0 0 auto; }
             #TorrentConfigPage .tc-status { font-size: .82rem; margin-top: .5rem; white-space: pre-wrap; }
             #TorrentConfigPage .tc-probe { font-size: .8rem; }
             #TorrentConfigPage .tc-probe .ok { color: #58c76a; }
@@ -47,6 +43,41 @@
             #TorrentConfigPage .tc-editor-head { display: flex; justify-content: space-between; align-items: center; gap: 1rem; }
             #TorrentConfigPage .tc-preview { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: .5rem; margin-top: .5rem; }
             #TorrentConfigPage .tc-preview .tc-prev { font-size: .78rem; padding: .5rem; border-radius: 6px; background: rgba(127,127,127,.1); }
+
+            /* --- base autosuficiente: no depende de los componentes de jellyfin-web --- */
+            #TorrentConfigPage * { box-sizing: border-box; }
+            #TorrentConfigPage h1 { font-size: 1.5rem; font-weight: 600; margin: 0 0 .25rem; }
+            #TorrentConfigPage h3 { font-size: 1.05rem; font-weight: 600; margin: .75rem 0 .35rem; }
+            #TorrentConfigPage button {
+                font: inherit; font-size: .88rem; line-height: 1.2; padding: .45rem .85rem;
+                border-radius: 6px; border: 1px solid rgba(127,127,127,.55);
+                background: rgba(127,127,127,.16); color: inherit; cursor: pointer;
+                display: inline-flex; align-items: center; gap: .3rem; white-space: nowrap;
+            }
+            #TorrentConfigPage button:hover:not(:disabled) { background: rgba(127,127,127,.3); }
+            #TorrentConfigPage button:disabled { opacity: .5; cursor: default; }
+            #TorrentConfigPage button.raised, #TorrentConfigPage button.button-submit, #TorrentConfigPage button[type=submit] {
+                background: #00a4dc; border-color: #00a4dc; color: #fff; font-weight: 600;
+            }
+            #TorrentConfigPage button.raised:hover:not(:disabled), #TorrentConfigPage button.button-submit:hover:not(:disabled) {
+                background: #008fbf; border-color: #008fbf;
+            }
+            #TorrentConfigPage input[type=text], #TorrentConfigPage input[type=search], #TorrentConfigPage input[type=number],
+            #TorrentConfigPage input[type=password], #TorrentConfigPage input[type=url], #TorrentConfigPage textarea, #TorrentConfigPage select {
+                font: inherit; font-size: .88rem; padding: .45rem .55rem; border-radius: 6px;
+                border: 1px solid rgba(127,127,127,.5); background: rgba(127,127,127,.12);
+                color: inherit; width: 100%;
+            }
+            #TorrentConfigPage input:focus, #TorrentConfigPage select:focus, #TorrentConfigPage textarea:focus {
+                outline: none; border-color: #00a4dc; box-shadow: 0 0 0 2px rgba(0,164,220,.25);
+            }
+            #TorrentConfigPage input[type=checkbox] { width: auto; height: auto; accent-color: #00a4dc; margin: 0 .4rem 0 0; }
+            #TorrentConfigPage label { display: inline-flex; align-items: center; gap: .3rem; cursor: pointer; }
+            #TorrentConfigPage .fieldDescription { font-size: .8rem; opacity: .7; margin-top: .2rem; }
+            #TorrentConfigPage a { color: #00a4dc; }
+
+            #TorrentConfigPage .tc-tab { border: 1px solid transparent; background: transparent; }
+            #TorrentConfigPage .tc-tab.on { background: rgba(0,164,220,.18); border-color: rgba(0,164,220,.6); font-weight: 600; }
             @media (max-width: 700px) { #TorrentConfigPage .tc-grid2 { grid-template-columns: 1fr; } }
         </style>
 
@@ -130,6 +161,18 @@
                 </div>
 
                 <div class="tc-pane" id="tcPaneSources">
+                    <div class="tc-row">
+                        <input type="text" id="tcDiscoverUrl" placeholder="https://laweb.to"
+                            style="flex:1 1 240px" />
+                        <button is="emby-button" type="button" id="tcDiscover" class="raised">
+                            <span>Analizar URL</span>
+                        </button>
+                    </div>
+                    <div class="tc-hint" id="tcDiscoverStatus">
+                        Pega la URL de una web de torrents y el plugin detectará el formulario de búsqueda,
+                        la lista de resultados y los enlaces.
+                    </div>
+
                     <div class="tc-row">
                         <button is="emby-button" type="button" id="tcAddSource" class="raised button-submit">
                             <span>Añadir fuente</span>
@@ -899,6 +942,44 @@
                         var pane = page.querySelector('#tcPane' + tab.getAttribute('data-tab').charAt(0).toUpperCase()
                             + tab.getAttribute('data-tab').slice(1));
                         if (pane) { pane.classList.add('on'); }
+                    });
+                });
+
+                page.querySelector('#tcDiscover').addEventListener('click', function () {
+                    var url = page.querySelector('#tcDiscoverUrl').value.trim();
+                    var status = page.querySelector('#tcDiscoverStatus');
+                    if (!url) {
+                        status.textContent = 'Escribe la URL de la web.';
+                        return;
+                    }
+
+                    status.textContent = 'Analizando ' + url + '… (puede tardar si necesita el navegador)';
+                    tcFetch('Torrent/api/source/discover', {
+                        method: 'POST',
+                        body: { url: url, query: 'matrix' }
+                    }).then(function (result) {
+                        if (!result.ok || !result.source) {
+                            status.textContent = 'No se pudo analizar: ' + (result.error || 'sin detalles');
+                            return;
+                        }
+
+                        var source = tcNormalizeSource(result.source);
+                        source.Enabled = false;
+                        TC.config.Sources.push(source);
+                        TC.editingIndex = TC.config.Sources.length - 1;
+                        tcRenderSources();
+                        tcRenderEditor();
+
+                        var text = 'Detectado (' + (result.confident ? 'fiable' : 'revisar') + '): '
+                            + (result.report || '');
+                        if (result.warnings && result.warnings.length) {
+                            text += ' — ' + result.warnings.join(' · ');
+                        }
+
+                        status.textContent = text;
+                        tcStatus('Fuente añadida sin guardar. Revisa los selectores y pulsa Guardar.');
+                    }).catch(function (err) {
+                        status.textContent = 'Error: ' + err.message;
                     });
                 });
 

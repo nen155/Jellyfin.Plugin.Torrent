@@ -26,6 +26,7 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator
         serviceCollection.AddSingleton<ISourceScraper, JsonSourceScraper>();
         serviceCollection.AddSingleton<ISourceScraper, TorznabSourceScraper>();
         serviceCollection.AddSingleton<DomainResolverService>();
+        serviceCollection.AddSingleton<SourceDiscoveryService>();
         serviceCollection.AddSingleton<TorrentSearchService>();
         serviceCollection.AddSingleton<ImageProxyService>();
         serviceCollection.AddSingleton<TorrentFileService>();

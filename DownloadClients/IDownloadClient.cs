@@ -64,6 +64,18 @@ public sealed class DownloadResult
 }
 
 /// <summary>
+/// Resultado de comprobar un cliente.
+/// </summary>
+public sealed class ProbeResult
+{
+    /// <summary>Gets or sets a value indicating whether el cliente responde.</summary>
+    public bool Available { get; set; }
+
+    /// <summary>Gets or sets el mensaje para el usuario.</summary>
+    public string Message { get; set; } = string.Empty;
+}
+
+/// <summary>
 /// Cliente de torrents capaz de aceptar enlaces.
 /// </summary>
 public interface IDownloadClient
@@ -79,8 +91,8 @@ public interface IDownloadClient
     /// </summary>
     /// <param name="config">Configuración del cliente.</param>
     /// <param name="cancellationToken">Token de cancelación.</param>
-    /// <returns>True si responde correctamente.</returns>
-    Task<bool> ProbeAsync(DownloadClientConfig config, CancellationToken cancellationToken);
+    /// <returns>Estado y mensaje del cliente.</returns>
+    Task<ProbeResult> ProbeAsync(DownloadClientConfig config, CancellationToken cancellationToken);
 
     /// <summary>
     /// Envía el enlace al cliente.

@@ -110,6 +110,8 @@ public sealed class PageLoader : IAsyncDisposable
     /// <param name="cancellationToken">Token de cancelación.</param>
     /// <param name="detailPage">True si es una ficha de detalle.</param>
     /// <param name="modeOverride">Fuerza un motor concreto (opcional).</param>
+    /// <param name="waitForText">Texto que debe aparecer (solo navegador).</param>
+    /// <param name="waitForStableDom">Espera a que el DOM deje de cambiar.</param>
     /// <returns>Resultado de la carga.</returns>
     public async Task<PageLoadResult> LoadAsync(
         TorrentSourceConfig source,
@@ -118,7 +120,9 @@ public sealed class PageLoader : IAsyncDisposable
         string? query,
         CancellationToken cancellationToken,
         bool detailPage = false,
-        FetchMode? modeOverride = null)
+        FetchMode? modeOverride = null,
+        string? waitForText = null,
+        bool waitForStableDom = false)
     {
         var mode = modeOverride ?? ResolveMode(source, detailPage);
         var script = detailPage ? source.DetailBrowserScript : source.BrowserScript;
@@ -149,7 +153,7 @@ public sealed class PageLoader : IAsyncDisposable
         }
 
         var browserResult = await TryBrowserAsync(
-                browserConfig, url, postBody, script, waitSelector, waitMs, cancellationToken)
+                browserConfig, url, postBody, script, waitSelector, waitMs, waitForText, waitForStableDom, cancellationToken)
             .ConfigureAwait(false);
 
         if (browserResult is not null)
@@ -315,6 +319,8 @@ public sealed class PageLoader : IAsyncDisposable
         string? script,
         string? waitSelector,
         int waitMs,
+        string? waitForText,
+        bool waitForStableDom,
         CancellationToken cancellationToken)
     {
         var canUseCdp = config.Mode is BrowserMode.Cdp or BrowserMode.Auto
@@ -332,6 +338,8 @@ public sealed class PageLoader : IAsyncDisposable
                         {
                             Script = script,
                             WaitSelector = waitSelector,
+                            WaitForText = waitForText,
+                            WaitForStableDom = waitForStableDom,
                             WaitMs = Math.Clamp(waitMs, 0, 30000),
                             TimeoutSeconds = Math.Clamp(config.TimeoutSeconds, 5, 180)
                         },

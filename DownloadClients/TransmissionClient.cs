@@ -32,14 +32,19 @@ public sealed class TransmissionClient : IDownloadClient, IDisposable
     public string DisplayName => "Transmission";
 
     /// <inheritdoc />
-    public async Task<bool> ProbeAsync(DownloadClientConfig config, CancellationToken cancellationToken)
+    public async Task<ProbeResult> ProbeAsync(DownloadClientConfig config, CancellationToken cancellationToken)
     {
-        var (success, _) = await CallAsync(
+        var (success, body) = await CallAsync(
                 config,
                 new { method = "session-get" },
                 cancellationToken)
             .ConfigureAwait(false);
-        return success;
+
+        return new ProbeResult
+        {
+            Available = success,
+            Message = success ? "Transmission conectado." : "Transmission no respondió: " + body
+        };
     }
 
     /// <inheritdoc />

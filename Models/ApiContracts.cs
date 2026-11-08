@@ -25,6 +25,18 @@ public class AddTorrentRequest
 }
 
 /// <summary>
+/// Petición para analizar una web y proponer su configuración.
+/// </summary>
+public class DiscoverRequest
+{
+    /// <summary>Gets or sets la URL de la web.</summary>
+    public string Url { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets el texto de prueba.</summary>
+    public string Query { get; set; } = "matrix";
+}
+
+/// <summary>
 /// Petición para probar el navegador con una URL.
 /// </summary>
 public class BrowserTestRequest

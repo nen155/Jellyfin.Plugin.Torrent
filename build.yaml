@@ -1,6 +1,6 @@
 name: "Torrent Search"
 guid: "5c1b8a63-7e42-4b0f-9d61-3a8f2c4e9b17"
-version: "1.1.0.0"
+version: "1.2.0.0"
 targetAbi: "12.1.0.0"
 framework: "net10.0"
 owner: "NeN"
@@ -19,12 +19,19 @@ description: >
   canal de Discord), fuentes Torznab (Jackett/Prowlarr) y un navegador
   headless (Chrome/Edge por CDP) que ejecuta el JavaScript de las webs,
   resuelve retos anti-bot y pulsa los botones de descarga protegidos,
-  capturando el .torrent con las cookies de la sesión.
+  capturando el .torrent con las cookies de la sesión. Con solo pegar la URL
+  de una web, el plugin analiza el formulario de búsqueda, la lista de
+  resultados y los enlaces, y propone la configuración de la fuente.
 category: "General"
 artifacts:
   - "Jellyfin.Plugin.Torrent.dll"
   - "AngleSharp.dll"
 changelog: |-
+  - 1.2.0: análisis automático de una web desde su URL (detecta formulario de
+    búsqueda, fila, título, enlaces, tamaño, idioma y ficha), fuentes
+    WatchSoMuch y DonTorrent incluidas y activadas, arreglo del cliente de
+    qBittorrent (cookie de sesión Secure, Referer/Origin, mensajes de error) y
+    estilos propios en las páginas del plugin.
   - 1.1.0: navegador headless (CDP) y FlareSolverr, captura de descargas
     protegidas, fuentes Torznab, resolución de páginas de descarga
     intermedias y plantillas de WatchSoMuch y DonTorrent.

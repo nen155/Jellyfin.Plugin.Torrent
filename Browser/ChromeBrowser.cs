@@ -19,6 +19,18 @@ public sealed class BrowserFetchOptions
     /// <summary>Gets or sets la espera tras cargar (ms).</summary>
     public int WaitMs { get; set; }
 
+    /// <summary>
+    /// Gets or sets un texto que debe aparecer en la página para considerarla
+    /// cargada (útil con resultados pintados por JavaScript).
+    /// </summary>
+    public string? WaitForText { get; set; }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether se espera a que el DOM deje de
+    /// cambiar (listas pintadas por JavaScript que tardan en aparecer).
+    /// </summary>
+    public bool WaitForStableDom { get; set; }
+
     /// <summary>Gets or sets el tiempo máximo total (segundos).</summary>
     public int TimeoutSeconds { get; set; } = 45;
 }
@@ -128,6 +140,17 @@ public sealed class ChromeBrowser : IAsyncDisposable
             {
                 await EvaluateAsync(options.Script!, cancellationToken).ConfigureAwait(false);
                 await Task.Delay(Math.Max(500, options.WaitMs), cancellationToken).ConfigureAwait(false);
+            }
+
+            if (!string.IsNullOrWhiteSpace(options.WaitForText))
+            {
+                await WaitForTextAsync(options.WaitForText!, timeout, cancellationToken)
+                    .ConfigureAwait(false);
+            }
+
+            if (options.WaitForStableDom)
+            {
+                await WaitForStableDomAsync(timeout, cancellationToken).ConfigureAwait(false);
             }
 
             if (!string.IsNullOrWhiteSpace(options.WaitSelector))
@@ -508,6 +531,78 @@ public sealed class ChromeBrowser : IAsyncDisposable
         }
 
         _logger.LogDebug("Torrent: el selector {Selector} no apareció a tiempo", selector);
+    }
+
+    private async Task WaitForStableDomAsync(TimeSpan timeout, CancellationToken cancellationToken)
+    {
+        var deadline = DateTimeOffset.UtcNow + timeout;
+        var previous = -1;
+        var stableCount = 0;
+        var started = DateTimeOffset.UtcNow;
+
+        while (DateTimeOffset.UtcNow < deadline)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            int length;
+            try
+            {
+                var value = await EvaluateStringAsync(
+                        "(document.body ? document.body.innerHTML.length : 0).toString()",
+                        cancellationToken)
+                    .ConfigureAwait(false);
+                length = int.TryParse(value, out var parsed) ? parsed : -1;
+            }
+            catch (InvalidOperationException)
+            {
+                length = -1;
+            }
+
+            if (length > 0 && length == previous)
+            {
+                stableCount++;
+                if (stableCount >= 2 && DateTimeOffset.UtcNow - started > TimeSpan.FromSeconds(2))
+                {
+                    return;
+                }
+            }
+            else
+            {
+                stableCount = 0;
+                previous = length;
+            }
+
+            await Task.Delay(500, cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    private async Task WaitForTextAsync(
+        string text,
+        TimeSpan timeout,
+        CancellationToken cancellationToken)
+    {
+        var expression =
+            "(document.body && document.body.innerText || '').toLowerCase().includes("
+            + JsonSerializer.Serialize(text.ToLowerInvariant()) + ")";
+        var deadline = DateTimeOffset.UtcNow + timeout;
+
+        while (DateTimeOffset.UtcNow < deadline)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            try
+            {
+                var found = Unwrap(await EvaluateAsync(expression, cancellationToken).ConfigureAwait(false));
+                if (found is not null && found.Value.ValueKind == JsonValueKind.True)
+                {
+                    return;
+                }
+            }
+            catch (InvalidOperationException)
+            {
+                // La página está navegando.
+            }
+
+            await Task.Delay(300, cancellationToken).ConfigureAwait(false);
+        }
     }
 
     private async Task<JsonElement?> EvaluateAsync(string expression, CancellationToken cancellationToken)
