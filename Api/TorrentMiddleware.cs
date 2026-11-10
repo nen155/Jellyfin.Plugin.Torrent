@@ -704,6 +704,24 @@ public class TorrentMiddleware
     {
         try
         {
+            // Las etiquetas <img> y los enlaces no envían cabeceras: el token
+            // llega como ?api_key=. Se promociona a cabecera para que Jellyfin
+            // lo valide igual que el resto de peticiones.
+            if (!context.Request.Headers.ContainsKey(HeaderNames.Authorization))
+            {
+                var token = context.Request.Query["api_key"].ToString();
+                if (string.IsNullOrWhiteSpace(token))
+                {
+                    token = context.Request.Query["ApiKey"].ToString();
+                }
+
+                if (!string.IsNullOrWhiteSpace(token))
+                {
+                    context.Request.Headers[HeaderNames.Authorization] =
+                        $"MediaBrowser Token=\"{token}\"";
+                }
+            }
+
             var info = await authorizationContext.GetAuthorizationInfo(context.Request)
                 .ConfigureAwait(false);
             if (info is null)
