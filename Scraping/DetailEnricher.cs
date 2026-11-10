@@ -72,10 +72,18 @@ public static partial class DetailEnricher
         }
 
         PageLoadResult loaded;
+        var usesPow = !string.IsNullOrWhiteSpace(source.PowUrl);
         try
         {
             loaded = await loader
-                .LoadAsync(source, result.DetailUrl, null, null, cancellationToken, detailPage: true)
+                .LoadAsync(
+                    source,
+                    result.DetailUrl,
+                    null,
+                    null,
+                    cancellationToken,
+                    detailPage: true,
+                    modeOverride: usesPow ? FetchMode.Http : null)
                 .ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -175,6 +183,22 @@ public static partial class DetailEnricher
         {
             links.AddRange(capturedLinks.Where(c =>
                 !links.Any(l => l.Url.Equals(c.Url, StringComparison.OrdinalIgnoreCase))));
+        }
+
+        // Botón de descarga protegido con proof-of-work: se resuelve por HTTP,
+        // sin abrir el navegador.
+        if (usesPow && links.Count == 0 && magnets.Count == 0)
+        {
+            var powUrl = await PowSolver
+                .ResolveAsync(source, document, finalUrl, logger, cancellationToken)
+                .ConfigureAwait(false);
+            if (!string.IsNullOrWhiteSpace(powUrl))
+            {
+                links.Add(new MagnetExtractor.TorrentLink(
+                    powUrl!,
+                    GuessReleaseFromUrl(powUrl!),
+                    null));
+            }
         }
 
         // Páginas intermedias de descarga: se abren para sacar el magnet.

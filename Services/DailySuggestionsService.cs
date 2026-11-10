@@ -20,12 +20,15 @@ public sealed partial class DailySuggestionsService
     private const int MinCacheMinutes = 5;
     private const int MaxCacheMinutes = 1440;
     private const int DefaultCacheMinutes = 720;
+    private const int MaxPosterLookups = 16;
+    private const int MaxParallelPosterLookups = 3;
 
     [GeneratedRegex(@"\s*\([^()]*?(19|20)\d{2}\)\s*$", RegexOptions.CultureInvariant)]
     private static partial Regex TrailingYearRegex();
 
     private readonly IReadOnlyList<ISourceScraper> _scrapers;
     private readonly DomainResolverService _domains;
+    private readonly PosterLookupService _posters;
     private readonly ILogger<DailySuggestionsService> _logger;
     private readonly SemaphoreSlim _buildGate = new(1, 1);
     private readonly object _sync = new();
@@ -39,14 +42,17 @@ public sealed partial class DailySuggestionsService
     /// </summary>
     /// <param name="scrapers">Extractores disponibles.</param>
     /// <param name="domains">Resolutor de dominios.</param>
+    /// <param name="posters">Buscador de carátulas por título.</param>
     /// <param name="logger">Logger.</param>
     public DailySuggestionsService(
         IEnumerable<ISourceScraper> scrapers,
         DomainResolverService domains,
+        PosterLookupService posters,
         ILogger<DailySuggestionsService> logger)
     {
         _scrapers = scrapers.ToList();
         _domains = domains;
+        _posters = posters;
         _logger = logger;
     }
 
@@ -250,6 +256,11 @@ public sealed partial class DailySuggestionsService
                 }
             }
 
+            if (config.LookupPostersOnline)
+            {
+                await FillPostersAsync(items, kind, cancellationToken).ConfigureAwait(false);
+            }
+
             outcome.Count = items.Count;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -269,9 +280,54 @@ public sealed partial class DailySuggestionsService
         return (kind, items, outcome);
     }
 
-    private static IEnumerable<(TorrentSourceConfig Source, MediaKind Kind, string Url)> BuildTargets(
-        TorrentSourceConfig source)
+    /// <summary>
+    /// Completa la carátula de las sugerencias que no la traen, buscándola en
+    /// la web por el título.
+    /// </summary>
+    private async Task FillPostersAsync(
+        List<DailySuggestion> items,
+        MediaKind kind,
+        CancellationToken cancellationToken)
     {
+        var missing = items
+            .Where(item => string.IsNullOrWhiteSpace(item.PosterUrl))
+            .Take(MaxPosterLookups)
+            .ToList();
+
+        if (missing.Count == 0)
+        {
+            return;
+        }
+
+        var gate = new SemaphoreSlim(MaxParallelPosterLookups);
+        var tasks = missing.Select(async item =>
+        {
+            await gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+            try
+            {
+                item.PosterUrl = await _posters
+                    .FindAsync(item.Title, item.Year, kind, cancellationToken)
+                    .ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "Torrent: sin carátula para {Title}", item.Title);
+            }
+            finally
+            {
+                gate.Release();
+            }
+        });
+
+        await Task.WhenAll(tasks).ConfigureAwait(false);
+    }
+
+    private static IEnumerable<(TorrentSourceConfig Source, MediaKind Kind, string Url)> BuildTargets(
+        TorrentSourceConfig source)    {
         if (!string.IsNullOrWhiteSpace(source.LatestMoviesUrl))
         {
             yield return (source, MediaKind.Movie, source.LatestMoviesUrl!);

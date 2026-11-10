@@ -46,6 +46,11 @@ retos anti-bot y pulsar los botones de descarga protegidos.
 - **Sugerencias del día**: previsualización de los últimos estrenos de
   películas y series, leídos de las listas de novedades de las fuentes y
   cacheados para no golpear las webs en cada visita.
+- **Búsqueda rápida**: las descargas protegidas con *proof-of-work* (por
+  ejemplo el botón de DonTorrent) se resuelven por HTTP, sin abrir el
+  navegador, así que una búsqueda completa tarda segundos.
+- **Carátulas**: si la fuente no publica una, se busca en la web por el título
+  (IMDb) y se cachea.
 - **Disponible para todos los clientes**: el buscador se sirve también en
   `/Torrent/` y el plugin añade un botón flotante y una fila de sugerencias a
   la interfaz web de Jellyfin, así que cualquier usuario (no solo el
@@ -94,6 +99,8 @@ Ajustes globales (pestaña **General**):
 
 - **Mostrar las sugerencias del día**: activa o desactiva la función.
 - **Sugerencias por tipo** y **minutos de caché** (por defecto 12 h).
+- **Buscar carátulas en la web por el título**: si la fuente no publica
+  carátula, se busca en IMDb (sin clave) y se cachea 12 h.
 - **Añadir la fila «Sugerencias del día» al inicio de la web**.
 - **Añadir el botón flotante «Torrents» a la web**.
 
@@ -104,6 +111,24 @@ si no encuentra nada.
 WatchSoMuch (`/Movies/` y `/Movies/Series/`) y DonTorrent (`/peliculas` y
 `/series`) traen sus URLs configuradas; en instalaciones existentes se
 rellenan solas la primera vez que se abre el plugin.
+
+## Descargas protegidas (proof-of-work)
+
+Algunas webs solo entregan el `.torrent` tras resolver un reto en el navegador
+(DonTorrent). El plugin puede resolverlo **por HTTP**, sin abrir Chrome, con lo
+que la ficha pasa de ~18 s a menos de medio segundo:
+
+| Campo | Ejemplo |
+|---|---|
+| URL del reto | `{base}/api_validate_pow.php` |
+| Selector del id de contenido | `.protected-download@data-content-id` |
+| Selector de la tabla/sección | `.protected-download@data-tabla` |
+| Dificultad | `3` (ceros hexadecimales del hash) |
+| Campo JSON con la URL | `download_url` |
+
+Con la URL del reto configurada, la ficha se lee por HTTP y se ignora el
+navegador de la ficha (los ajustes de navegador quedan como respaldo si borras
+ese campo).
 
 ## Acceso desde los clientes
 
@@ -200,6 +225,12 @@ Opciones: carpeta de descarga, categoría y etiquetas (qBittorrent) y añadir en
 pausa. **«Probar conexión»** indica qué clientes responden y, si fallan, el
 motivo exacto.
 
+Si el cliente está cerrado, el plugin intenta **abrir su ejecutable** (ruta
+configurada o detección automática de qBittorrent, Transmission y Deluge) y
+reintenta el envío. Si aun así no responde, **guarda el `.torrent` (o el
+`.magnet`) en la carpeta indicada**: la de respaldo, la de descarga o
+«Descargas» del usuario, por ese orden.
+
 Notas para qBittorrent:
 
 - El **WebUI tiene que estar activado** y su puerto **libre**. Si otro programa
@@ -215,7 +246,8 @@ Al pulsar **Descargar**:
 1. Si el enlace se descubrió con el navegador y la web protege la descarga, se
    descarga el `.torrent` con las cookies de esa sesión y se envía como archivo.
 2. Si el cliente responde, se añade el magnet o el `.torrent`.
-3. Si no hay cliente disponible, la interfaz abre el magnet en el navegador.
+3. Si el cliente no responde, se intenta abrir y, si sigue sin responder, el
+   enlace se guarda en la carpeta de respaldo.
 
 ## Uso del buscador
 

@@ -190,6 +190,17 @@
 
                     <div class="checkboxContainer checkboxContainer-withDescription">
                         <label>
+                            <input is="emby-toggle" type="checkbox" id="tcLookupPosters" />
+                            <span>Buscar carátulas en la web por el título</span>
+                        </label>
+                        <div class="fieldDescription checkboxFieldDescription">
+                            Si la fuente no publica carátula, se busca por el nombre en la API pública de
+                            iTunes. Se cachea 12 h.
+                        </div>
+                    </div>
+
+                    <div class="checkboxContainer checkboxContainer-withDescription">
+                        <label>
                             <input is="emby-toggle" type="checkbox" id="tcSuggestHomeRow" />
                             <span>Añadir la fila «Sugerencias del día» al inicio de la web</span>
                         </label>
@@ -348,6 +359,22 @@
                             <label for="tcClientTags">Etiquetas (separadas por comas)</label>
                             <input type="text" id="tcClientTags" />
                         </div>
+                        <div class="tc-field">
+                            <label for="tcClientExe">Ejecutable del cliente</label>
+                            <input type="text" id="tcClientExe" placeholder="(detección automática)" />
+                            <div class="tc-hint">
+                                Se abre si el cliente no responde. Vacío = se busca qBittorrent,
+                                Transmission y Deluge en sus rutas habituales.
+                            </div>
+                        </div>
+                        <div class="tc-field">
+                            <label for="tcClientFallbackPath">Carpeta si el cliente no está disponible</label>
+                            <input type="text" id="tcClientFallbackPath" placeholder="(la carpeta de descarga)" />
+                            <div class="tc-hint">
+                                Ahí se guarda el .torrent (o el .magnet) cuando no hay cliente. Vacío = la
+                                carpeta de descarga y, si tampoco hay, «Descargas» del usuario.
+                            </div>
+                        </div>
                     </div>
 
                     <div class="checkboxContainer checkboxContainer-withDescription">
@@ -355,6 +382,17 @@
                             <input is="emby-toggle" type="checkbox" id="tcClientPaused" />
                             <span>Añadir en pausa</span>
                         </label>
+                    </div>
+
+                    <div class="checkboxContainer checkboxContainer-withDescription">
+                        <label>
+                            <input is="emby-toggle" type="checkbox" id="tcClientAutoStart" />
+                            <span>Abrir el cliente si no está en marcha</span>
+                        </label>
+                        <div class="fieldDescription checkboxFieldDescription">
+                            Se intenta lanzar el ejecutable y, si aun así no responde, el enlace se guarda en
+                            la carpeta indicada.
+                        </div>
                     </div>
 
                     <div class="tc-row">
@@ -456,6 +494,27 @@
                     hint: 'Vacío = el de la búsqueda.'
                 },
                 {
+                    key: 'PowUrl', label: 'URL del reto de descarga', section: 'pow', type: 'text',
+                    hint: 'Si la web protege el botón con proof-of-work. Ej.: {base}/api_validate_pow.php. ' +
+                        'Con esto la ficha se lee por HTTP y no se abre el navegador.'
+                },
+                {
+                    key: 'PowContentIdSelector', label: 'Selector del id de contenido', section: 'pow', type: 'text',
+                    hint: 'Ej.: .protected-download@data-content-id'
+                },
+                {
+                    key: 'PowTableSelector', label: 'Selector de la tabla/sección', section: 'pow', type: 'text',
+                    hint: 'Ej.: .protected-download@data-tabla'
+                },
+                {
+                    key: 'PowDifficulty', label: 'Dificultad del reto', section: 'pow', type: 'number',
+                    hint: 'Ceros hexadecimales que debe tener el hash (normalmente 3).'
+                },
+                {
+                    key: 'PowDownloadField', label: 'Campo JSON con la URL', section: 'pow', type: 'text',
+                    hint: 'Por defecto: download_url'
+                },
+                {
                     key: 'FetchDetails', label: 'Visitar la ficha de detalle', section: 'detalle', type: 'checkbox',
                     hint: 'Necesario si los enlaces o la carátula solo están en la ficha.'
                 },
@@ -515,6 +574,7 @@
                 ['busqueda', 'Búsqueda'],
                 ['html', 'Extracción HTML'],
                 ['novedades', 'Sugerencias del día (novedades)'],
+                ['pow', 'Descargas protegidas (proof-of-work)'],
                 ['detalle', 'Ficha de detalle'],
                 ['navegador', 'Navegador (JavaScript)'],
                 ['json', 'Extracción JSON'],
@@ -695,6 +755,11 @@
                     LatestTitleSelector: '',
                     LatestLinkSelector: '',
                     LatestPosterSelector: '',
+                    PowUrl: '',
+                    PowContentIdSelector: '',
+                    PowTableSelector: '',
+                    PowDifficulty: 3,
+                    PowDownloadField: 'download_url',
                     Domain: {
                         Provider: 'None', Url: '', Regex: '', DiscordBotToken: '',
                         DiscordChannelId: '', CacheMinutes: 60, AutoApply: true
@@ -962,6 +1027,7 @@
                 page.querySelector('#tcSuggestCache').value = config.DailySuggestionsCacheMinutes || 720;
                 page.querySelector('#tcSuggestHomeRow').checked = config.DailySuggestionsHomeRow !== false;
                 page.querySelector('#tcSuggestWebButton').checked = config.DailySuggestionsWebButton !== false;
+                page.querySelector('#tcLookupPosters').checked = config.LookupPostersOnline !== false;
             }
 
             function tcFillBrowser() {
@@ -988,6 +1054,9 @@
                 page.querySelector('#tcClientCategory').value = client.Category || '';
                 page.querySelector('#tcClientTags').value = client.Tags || '';
                 page.querySelector('#tcClientPaused').checked = !!client.StartPaused;
+                page.querySelector('#tcClientExe').value = client.ExecutablePath || '';
+                page.querySelector('#tcClientAutoStart').checked = client.AutoStart !== false;
+                page.querySelector('#tcClientFallbackPath').value = client.FallbackPath || '';
             }
 
             function tcCollect() {
@@ -1011,6 +1080,7 @@
                 config.DailySuggestionsCacheMinutes = parseInt(page.querySelector('#tcSuggestCache').value, 10) || 720;
                 config.DailySuggestionsHomeRow = page.querySelector('#tcSuggestHomeRow').checked;
                 config.DailySuggestionsWebButton = page.querySelector('#tcSuggestWebButton').checked;
+                config.LookupPostersOnline = page.querySelector('#tcLookupPosters').checked;
 
                 config.Browser = {
                     Mode: page.querySelector('#tcBrowserMode').value,
@@ -1031,7 +1101,10 @@
                     SavePath: page.querySelector('#tcClientPath').value.trim(),
                     Category: page.querySelector('#tcClientCategory').value.trim(),
                     Tags: page.querySelector('#tcClientTags').value.trim(),
-                    StartPaused: page.querySelector('#tcClientPaused').checked
+                    StartPaused: page.querySelector('#tcClientPaused').checked,
+                    ExecutablePath: page.querySelector('#tcClientExe').value.trim(),
+                    AutoStart: page.querySelector('#tcClientAutoStart').checked,
+                    FallbackPath: page.querySelector('#tcClientFallbackPath').value.trim()
                 };
 
                 return config;

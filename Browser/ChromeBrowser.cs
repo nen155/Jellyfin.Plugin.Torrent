@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Text.Json;
 using Jellyfin.Plugin.Torrent.Models;
+using Jellyfin.Plugin.Torrent.Scraping;
 using Microsoft.Extensions.Logging;
 
 namespace Jellyfin.Plugin.Torrent.Browser;
@@ -60,6 +61,8 @@ public sealed class BrowserPageResult
 /// </summary>
 public sealed class ChromeBrowser : IAsyncDisposable
 {
+    private const int SettleMs = 800;
+
     private readonly ILogger<ChromeBrowser> _logger;
     private readonly BrowserConfig _config;
     private readonly SemaphoreSlim _gate = new(1, 1);
@@ -131,15 +134,23 @@ public sealed class ChromeBrowser : IAsyncDisposable
                     .ConfigureAwait(false);
             }
 
-            if (options.WaitMs > 0)
-            {
-                await Task.Delay(options.WaitMs, cancellationToken).ConfigureAwait(false);
-            }
-
             if (!string.IsNullOrWhiteSpace(options.Script))
             {
+                // Un asentamiento corto basta para que la web enganche sus
+                // eventos; el resto del tiempo se dedica a esperar la descarga,
+                // que termina en cuanto se captura.
+                if (options.WaitMs > 0)
+                {
+                    await Task.Delay(Math.Min(options.WaitMs, SettleMs), cancellationToken)
+                        .ConfigureAwait(false);
+                }
+
                 await EvaluateAsync(options.Script!, cancellationToken).ConfigureAwait(false);
-                await Task.Delay(Math.Max(500, options.WaitMs), cancellationToken).ConfigureAwait(false);
+                await WaitForCapturedDownloadAsync(options.WaitMs, cancellationToken).ConfigureAwait(false);
+            }
+            else if (options.WaitMs > 0)
+            {
+                await Task.Delay(options.WaitMs, cancellationToken).ConfigureAwait(false);
             }
 
             if (!string.IsNullOrWhiteSpace(options.WaitForText))
@@ -220,6 +231,40 @@ public sealed class ChromeBrowser : IAsyncDisposable
 
     /// <inheritdoc />
     public async ValueTask DisposeAsync() => await StopAsync().ConfigureAwait(false);
+
+    /// <summary>
+    /// Espera a que se capture una descarga (magnet, .torrent o URL de
+    /// descarga) tras ejecutar un script, sin agotar el tiempo máximo cuando
+    /// aparece enseguida.
+    /// </summary>
+    private async Task WaitForCapturedDownloadAsync(int maxWaitMs, CancellationToken cancellationToken)
+    {
+        var limit = Math.Clamp(maxWaitMs, 0, 30000);
+        if (limit == 0)
+        {
+            return;
+        }
+
+        var deadline = DateTimeOffset.UtcNow.AddMilliseconds(limit);
+        while (DateTimeOffset.UtcNow < deadline)
+        {
+            if (HasCapturedDownload())
+            {
+                return;
+            }
+
+            await Task.Delay(200, cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    private bool HasCapturedDownload()
+    {
+        lock (_urlLock)
+        {
+            return _downloadUrls.Count > 0
+                || _networkUrls.Any(MagnetExtractor.LooksLikeTorrentDownload);
+        }
+    }
 
     /// <summary>
     /// Busca el ejecutable de un navegador compatible.

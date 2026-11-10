@@ -30,6 +30,8 @@ public class TorrentSourceConfig
         BrowserWaitMs = 1200;
         DetailBrowserWaitMs = 2500;
         ResolveReleaseLinks = true;
+        PowDifficulty = 3;
+        PowDownloadField = "download_url";
     }
 
     /// <summary>Gets or sets el identificador interno de la fuente.</summary>
@@ -187,6 +189,32 @@ public class TorrentSourceConfig
     /// <summary>Gets or sets el selector de la carátula en las novedades.</summary>
     public string? LatestPosterSelector { get; set; }
 
+    // --------------- Descargas protegidas (proof-of-work) ---------------
+
+    /// <summary>
+    /// Gets or sets la URL que genera y valida el reto de descarga (admite
+    /// <c>{base}</c>). Con esto la ficha se resuelve por HTTP, sin navegador.
+    /// </summary>
+    public string? PowUrl { get; set; }
+
+    /// <summary>
+    /// Gets or sets el selector del id de contenido del botón de descarga
+    /// (p. ej. <c>.protected-download@data-content-id</c>).
+    /// </summary>
+    public string? PowContentIdSelector { get; set; }
+
+    /// <summary>
+    /// Gets or sets el selector de la tabla o sección del botón
+    /// (p. ej. <c>.protected-download@data-tabla</c>).
+    /// </summary>
+    public string? PowTableSelector { get; set; }
+
+    /// <summary>Gets or sets la dificultad del reto (ceros hexadecimales).</summary>
+    public int PowDifficulty { get; set; }
+
+    /// <summary>Gets or sets el campo JSON con la URL de descarga.</summary>
+    public string? PowDownloadField { get; set; }
+
     // ------------------------ Ficha de detalle ------------------------
 
     /// <summary>
@@ -305,6 +333,11 @@ public class TorrentSourceConfig
         LatestTitleSelector = LatestTitleSelector,
         LatestLinkSelector = LatestLinkSelector,
         LatestPosterSelector = LatestPosterSelector,
+        PowUrl = PowUrl,
+        PowContentIdSelector = PowContentIdSelector,
+        PowTableSelector = PowTableSelector,
+        PowDifficulty = PowDifficulty,
+        PowDownloadField = PowDownloadField,
         FetchDetails = FetchDetails,
         DetailMagnetSelector = DetailMagnetSelector,
         DetailTorrentSelector = DetailTorrentSelector,

@@ -19,6 +19,9 @@ public class DownloadClientConfig
         Category = string.Empty;
         Tags = string.Empty;
         StartPaused = false;
+        ExecutablePath = string.Empty;
+        AutoStart = true;
+        FallbackPath = string.Empty;
     }
 
     /// <summary>Gets or sets el tipo de cliente.</summary>
@@ -47,6 +50,25 @@ public class DownloadClientConfig
 
     /// <summary>Gets or sets a value indicating whether se añade en pausa.</summary>
     public bool StartPaused { get; set; }
+
+    /// <summary>
+    /// Gets or sets la ruta del ejecutable del cliente. Vacío = se busca en las
+    /// ubicaciones habituales (qBittorrent, Transmission, Deluge).
+    /// </summary>
+    public string ExecutablePath { get; set; }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether se intenta abrir el cliente
+    /// cuando no responde.
+    /// </summary>
+    public bool AutoStart { get; set; }
+
+    /// <summary>
+    /// Gets or sets la carpeta donde se guarda el .torrent cuando no hay
+    /// cliente disponible. Vacío = la carpeta de descarga y, si tampoco hay,
+    /// la carpeta «Descargas» del usuario.
+    /// </summary>
+    public string FallbackPath { get; set; }
 
     /// <summary>
     /// Gets or sets la URL base completa del cliente

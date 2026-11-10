@@ -48,8 +48,10 @@
 
     function proxied(url, referer) {
         if (!url) { return ''; }
+        var token = accessToken();
         return base + '/api/image?u=' + encodeURIComponent(url)
-            + '&r=' + encodeURIComponent(referer || '');
+            + '&r=' + encodeURIComponent(referer || '')
+            + (token ? '&api_key=' + encodeURIComponent(token) : '');
     }
 
     function el(tag, css, text) {

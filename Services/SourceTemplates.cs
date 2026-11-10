@@ -116,9 +116,9 @@ public static class SourceTemplates
             Name = "DonTorrent (metadatos)",
             Verified = true,
             Description = "Búsqueda y metadatos en español. El botón de descarga está protegido con "
-                + "proof-of-work: la ficha se abre con el navegador headless, se pulsa el botón y el plugin "
-                + "captura el .torrent resultante con las cookies de la sesión. Trae configuradas las "
-                + "listas de novedades de películas y series para las sugerencias del día.",
+                + "proof-of-work: el plugin resuelve el reto por HTTP (sin navegador) y obtiene el "
+                + ".torrent al instante. Trae configuradas las listas de novedades de películas y "
+                + "series para las sugerencias del día.",
             Source = new TorrentSourceConfig
             {
                 Name = "DonTorrent",
@@ -137,6 +137,11 @@ public static class SourceTemplates
                 LatestTitleSelector = "@self",
                 LatestLinkSelector = "@self@href",
                 LatestPosterSelector = "img@src",
+                PowUrl = "{base}/api_validate_pow.php",
+                PowContentIdSelector = ".protected-download@data-content-id",
+                PowTableSelector = ".protected-download@data-tabla",
+                PowDifficulty = 3,
+                PowDownloadField = "download_url",
                 FetchDetails = true,
                 DetailFetchMode = FetchMode.Browser,
                 DetailBrowserWaitMs = 9000,

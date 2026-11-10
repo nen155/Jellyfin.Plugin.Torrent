@@ -370,8 +370,26 @@
                 });
             }
 
-            function tsEscape(value) {
-                if (value === null || value === undefined) { return ''; }
+            function tsApiKey() {
+                try {
+                    return (typeof ApiClient !== 'undefined' && ApiClient.accessToken)
+                        ? (ApiClient.accessToken() || '')
+                        : '';
+                } catch (e) {
+                    return '';
+                }
+            }
+
+            // Las etiquetas <img> y los enlaces no envían la cabecera de
+            // autorización: el token va en la URL (?api_key=).
+            function tsAuthedUrl(url) {
+                var token = tsApiKey();
+                if (!token) { return url; }
+                return url + (url.indexOf('?') >= 0 ? '&' : '?')
+                    + 'api_key=' + encodeURIComponent(token);
+            }
+
+            function tsEscape(value) {                if (value === null || value === undefined) { return ''; }
                 return String(value)
                     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
                     .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
@@ -408,9 +426,9 @@
             function tsPoster(item) {
                 if (!item.posterUrl) { return null; }
                 if (!TS.config || !TS.config.proxyImages) { return item.posterUrl; }
-                return ApiClient.getUrl('Torrent/api/image')
+                return tsAuthedUrl(ApiClient.getUrl('Torrent/api/image')
                     + '?u=' + encodeURIComponent(item.posterUrl)
-                    + '&r=' + encodeURIComponent(item.detailUrl || '');
+                    + '&r=' + encodeURIComponent(item.detailUrl || ''));
             }
 
             function tsLoadConfig() {
@@ -443,9 +461,9 @@
             function tsSuggestionPoster(item) {
                 if (!item || !item.posterUrl) { return null; }
                 if (!TS.config || !TS.config.proxyImages) { return item.posterUrl; }
-                return ApiClient.getUrl('Torrent/api/image')
+                return tsAuthedUrl(ApiClient.getUrl('Torrent/api/image')
                     + '?u=' + encodeURIComponent(item.posterUrl)
-                    + '&r=' + encodeURIComponent(item.detailUrl || '');
+                    + '&r=' + encodeURIComponent(item.detailUrl || ''));
             }
 
             function tsRenderSuggestionStrip(containerId, titleId, items, kind) {
@@ -741,6 +759,11 @@
                         referer: item.detailUrl
                     }
                 }).then(function (result) {
+                    if (result.savedPath) {
+                        tsToast(result.message || ('Guardado en ' + result.savedPath), 'ok');
+                        return;
+                    }
+
                     if (result.fallback) {
                         tsToast(result.message || 'Abriendo el enlace con tu cliente…');
                         var link = result.magnet || result.torrentUrl;
@@ -807,10 +830,10 @@
                         : '')
                     + (item.torrentUrl
                         ? '<a is="emby-button" class="raised" target="_blank" rel="noopener" href="'
-                            + tsEscape(ApiClient.getUrl('Torrent/api/torrent')
+                            + tsEscape(tsAuthedUrl(ApiClient.getUrl('Torrent/api/torrent')
                                 + '?u=' + encodeURIComponent(item.torrentUrl)
                                 + '&r=' + encodeURIComponent(item.detailUrl || '')
-                                + '&name=' + encodeURIComponent(item.title || 'torrent'))
+                                + '&name=' + encodeURIComponent(item.title || 'torrent')))
                             + '"><span>Descargar .torrent</span></a>'
                         : '')
                     + (item.torrentUrl

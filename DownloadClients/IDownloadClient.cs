@@ -61,6 +61,12 @@ public sealed class DownloadResult
 
     /// <summary>Gets or sets la URL del .torrent.</summary>
     public string? TorrentUrl { get; set; }
+
+    /// <summary>
+    /// Gets or sets la ruta del archivo guardado cuando no había cliente
+    /// disponible (.torrent o .magnet).
+    /// </summary>
+    public string? SavedPath { get; set; }
 }
 
 /// <summary>

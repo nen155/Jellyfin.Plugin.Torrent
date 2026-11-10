@@ -42,9 +42,9 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
     public static Plugin? Instance { get; private set; }
 
     /// <summary>
-    /// Rellena las URLs de novedades de las fuentes incluidas (WatchSoMuch y
-    /// DonTorrent) cuando todavía no están configuradas, para que las
-    /// sugerencias del día funcionen también al actualizar el plugin.
+    /// Rellena las URLs de novedades y el reto de descarga (proof-of-work) de
+    /// las fuentes incluidas cuando todavía no están configurados, para que las
+    /// sugerencias del día y las descargas rápidas funcionen al actualizar.
     /// </summary>
     public void EnsureLatestDefaults()
     {
@@ -69,19 +69,34 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
         foreach (var source in Configuration.Sources)
         {
             if (!known.TryGetValue(source.Id, out var key)
-                || !templates.TryGetValue(key, out var template)
-                || !IsLatestEmpty(source))
+                || !templates.TryGetValue(key, out var template))
             {
                 continue;
             }
 
-            source.LatestMoviesUrl = template.Source.LatestMoviesUrl;
-            source.LatestSeriesUrl = template.Source.LatestSeriesUrl;
-            source.LatestRowSelector = template.Source.LatestRowSelector;
-            source.LatestTitleSelector = template.Source.LatestTitleSelector;
-            source.LatestLinkSelector = template.Source.LatestLinkSelector;
-            source.LatestPosterSelector = template.Source.LatestPosterSelector;
-            changed = true;
+            if (IsLatestEmpty(source))
+            {
+                source.LatestMoviesUrl = template.Source.LatestMoviesUrl;
+                source.LatestSeriesUrl = template.Source.LatestSeriesUrl;
+                source.LatestRowSelector = template.Source.LatestRowSelector;
+                source.LatestTitleSelector = template.Source.LatestTitleSelector;
+                source.LatestLinkSelector = template.Source.LatestLinkSelector;
+                source.LatestPosterSelector = template.Source.LatestPosterSelector;
+                changed = true;
+            }
+
+            // Las fuentes que ya existían resuelven la descarga protegida por
+            // HTTP (mucho más rápido que abrir el navegador en cada ficha).
+            if (string.IsNullOrWhiteSpace(source.PowUrl)
+                && !string.IsNullOrWhiteSpace(template.Source.PowUrl))
+            {
+                source.PowUrl = template.Source.PowUrl;
+                source.PowContentIdSelector = template.Source.PowContentIdSelector;
+                source.PowTableSelector = template.Source.PowTableSelector;
+                source.PowDifficulty = template.Source.PowDifficulty;
+                source.PowDownloadField = template.Source.PowDownloadField;
+                changed = true;
+            }
         }
 
         if (changed)

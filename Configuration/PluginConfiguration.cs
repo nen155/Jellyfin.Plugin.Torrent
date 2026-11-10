@@ -26,6 +26,7 @@ public class PluginConfiguration : BasePluginConfiguration
         DailySuggestionsCacheMinutes = 720;
         DailySuggestionsHomeRow = true;
         DailySuggestionsWebButton = true;
+        LookupPostersOnline = true;
         BlockedKeywords = new List<string>();
         Sources = new List<Models.TorrentSourceConfig>();
         DownloadClient = new Models.DownloadClientConfig
@@ -93,6 +94,12 @@ public class PluginConfiguration : BasePluginConfiguration
     /// jellyfin-web para abrir el buscador desde cualquier cliente.
     /// </summary>
     public bool DailySuggestionsWebButton { get; set; }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether se buscan carátulas en la web
+    /// por el título cuando la fuente no las publica.
+    /// </summary>
+    public bool LookupPostersOnline { get; set; }
 
     /// <summary>Gets or sets las fuentes configuradas.</summary>
     public List<Models.TorrentSourceConfig> Sources { get; set; }
