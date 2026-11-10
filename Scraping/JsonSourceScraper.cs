@@ -30,21 +30,38 @@ public sealed class JsonSourceScraper : SourceScraperBase, ISourceScraper
     public SourceKind Kind => SourceKind.Json;
 
     /// <inheritdoc />
-    public async Task<SourceSearchResult> SearchAsync(
+    public Task<SourceSearchResult> SearchAsync(
         TorrentSourceConfig source,
         string baseUrl,
         string query,
+        CancellationToken cancellationToken) =>
+        RunAsync(source, baseUrl, source.SearchUrl, query, usePost: true, cancellationToken);
+
+    /// <inheritdoc />
+    public Task<SourceSearchResult> BrowseAsync(
+        TorrentSourceConfig source,
+        string baseUrl,
+        string urlTemplate,
+        CancellationToken cancellationToken) =>
+        RunAsync(source, baseUrl, urlTemplate, string.Empty, usePost: false, cancellationToken);
+
+    private async Task<SourceSearchResult> RunAsync(
+        TorrentSourceConfig source,
+        string baseUrl,
+        string urlTemplate,
+        string query,
+        bool usePost,
         CancellationToken cancellationToken)
     {
         var outcome = new SourceSearchResult();
-        var url = BuildUrl(source.SearchUrl, baseUrl, query, 1);
+        var url = BuildUrl(urlTemplate, baseUrl, query, 1);
         if (url is null)
         {
             outcome.Error = "La plantilla de búsqueda no genera una URL válida.";
             return outcome;
         }
 
-        var postBody = source.SearchMethod == SearchHttpMethod.Post
+        var postBody = usePost && source.SearchMethod == SearchHttpMethod.Post
             ? BuildBody(source.SearchBody, query, 1)
             : null;
 

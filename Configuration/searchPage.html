@@ -73,6 +73,36 @@
             #TorrentSearchPage .ts-actions { display: flex; gap: .4rem; margin-top: auto; flex-wrap: wrap; }
             #TorrentSearchPage .ts-actions button { font-size: .78rem; }
             #TorrentSearchPage .ts-empty { padding: 2rem 0; text-align: center; opacity: .7; }
+            #TorrentSearchPage .ts-suggest {
+                border: 1px solid rgba(127,127,127,.25); border-radius: 10px; padding: .6rem .8rem;
+                margin: 1rem 0 .5rem; background: rgba(127,127,127,.06);
+            }
+            #TorrentSearchPage .ts-suggest-head {
+                display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap;
+            }
+            #TorrentSearchPage .ts-suggest-tools { display: flex; align-items: center; gap: .5rem; }
+            #TorrentSearchPage .ts-suggest-kind { font-size: .78rem; opacity: .65; margin: .5rem 0 .25rem; }
+            #TorrentSearchPage .ts-strip { display: flex; gap: .6rem; overflow-x: auto; padding-bottom: .35rem; }
+            #TorrentSearchPage .ts-sug { flex: 0 0 auto; width: 120px; cursor: pointer; }
+            #TorrentSearchPage .ts-sug-poster {
+                position: relative; width: 120px; height: 180px; border-radius: 6px; overflow: hidden;
+                background: rgba(127,127,127,.18); border: 1px solid transparent; display: flex;
+                align-items: center; justify-content: center; font-size: 1.6rem;
+            }
+            #TorrentSearchPage .ts-sug:hover .ts-sug-poster { border-color: var(--theme-primary-color, #00a4dc); }
+            #TorrentSearchPage .ts-sug-poster img { width: 100%; height: 100%; object-fit: cover; display: block; }
+            #TorrentSearchPage .ts-sug-open {
+                position: absolute; top: 4px; right: 4px; background: rgba(0,0,0,.65); color: #fff;
+                border-radius: 4px; padding: 0 .3rem; font-size: .7rem; text-decoration: none; line-height: 1.4;
+            }
+            #TorrentSearchPage .ts-sug-title {
+                font-size: .78rem; line-height: 1.2; margin-top: .3rem; max-height: 2.4em; overflow: hidden;
+            }
+            #TorrentSearchPage .ts-sug-meta {
+                font-size: .68rem; opacity: .6; margin-top: .1rem; white-space: nowrap;
+                overflow: hidden; text-overflow: ellipsis;
+            }
+            #TorrentSearchPage .ts-suggest-empty { font-size: .8rem; opacity: .7; padding: .4rem 0; }
             #TorrentSearchPage .ts-modal {
                 position: fixed; inset: 0; background: rgba(0,0,0,.6); z-index: 10000;
                 display: none; align-items: center; justify-content: center; padding: 1rem;
@@ -151,6 +181,23 @@
                             <span>Enlace manual</span>
                         </button>
                     </div>
+                </div>
+
+                <div class="ts-suggest" id="tsSuggest" style="display:none">
+                    <div class="ts-suggest-head">
+                        <h3 style="margin:0">Sugerencias del día</h3>
+                        <div class="ts-suggest-tools">
+                            <span class="fieldDescription" id="tsSuggestStatus" style="margin:0"></span>
+                            <button is="emby-button" type="button" id="tsSuggestRefresh">
+                                <span>Actualizar</span>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="ts-suggest-kind" id="tsSuggestMoviesTitle" style="display:none">Películas</div>
+                    <div class="ts-strip" id="tsSuggestMovies"></div>
+                    <div class="ts-suggest-kind" id="tsSuggestSeriesTitle" style="display:none">Series</div>
+                    <div class="ts-strip" id="tsSuggestSeries"></div>
+                    <div class="ts-suggest-empty" id="tsSuggestEmpty" style="display:none"></div>
                 </div>
 
                 <div class="ts-row" style="margin-top:1rem">
@@ -235,9 +282,51 @@
         </div>
 
         <script type="text/javascript">
+            // --- Página independiente (/Torrent/): sin jellyfin-web ---
+            (function () {
+                if (typeof window.ApiClient !== 'undefined') { return; }
+
+                var token = '';
+                try {
+                    var raw = window.localStorage.getItem('jellyfin_credentials') || '';
+                    if (!raw) {
+                        raw = window.sessionStorage.getItem('jellyfin_credentials') || '';
+                    }
+
+                    var creds = JSON.parse(raw || '{}');
+                    var servers = creds.Servers || [];
+                    var origin = window.location.origin || '';
+                    var chosen = null;
+                    servers.forEach(function (server) {
+                        if (chosen) { return; }
+                        var address = String(server.ManualAddress || server.Address || '').replace(/\/+$/, '');
+                        if (address && origin && address.indexOf(origin) === 0) { chosen = server; }
+                    });
+                    chosen = chosen || servers.filter(function (s) { return s.AccessToken; })[0] || null;
+                    token = chosen && chosen.AccessToken ? chosen.AccessToken : '';
+                } catch (e) { token = ''; }
+
+                window.TS_STANDALONE = true;
+                window.ApiClient = {
+                    accessToken: function () { return token; },
+                    getUrl: function (path) {
+                        // La página se sirve en /Torrent/: las rutas del plugin son relativas.
+                        return String(path || '').replace(/^Torrent\//i, '');
+                    },
+                    getCurrentUser: function () {
+                        return fetch('../Users/Me', {
+                            headers: { Authorization: 'MediaBrowser Token="' + token + '"' }
+                        }).then(function (response) {
+                            return response.ok ? response.json() : null;
+                        });
+                    }
+                };
+            })();
+
             var TS = {
                 config: null,
                 results: [],
+                suggestions: { movies: [], series: [] },
                 selectedSources: [],
                 languages: [],
                 busy: false
@@ -339,10 +428,146 @@
                         page.querySelector('#tsMinSeeds').value = config.minSeeds || 0;
                     }
                     tsRenderSources(config.sources);
+                    tsLoadSuggestions();
                 }).catch(function (err) {
                     var info = tsPage().querySelector('#tsClientInfo');
-                    if (info) { info.textContent = 'No se pudo cargar la configuración: ' + err.message; }
+                    if (info) {
+                        info.textContent = (window.TS_STANDALONE && ApiClient.accessToken
+                            && !ApiClient.accessToken())
+                            ? 'Inicia sesión en Jellyfin desde este navegador para usar el buscador.'
+                            : 'No se pudo cargar la configuración: ' + err.message;
+                    }
                 });
+            }
+
+            function tsSuggestionPoster(item) {
+                if (!item || !item.posterUrl) { return null; }
+                if (!TS.config || !TS.config.proxyImages) { return item.posterUrl; }
+                return ApiClient.getUrl('Torrent/api/image')
+                    + '?u=' + encodeURIComponent(item.posterUrl)
+                    + '&r=' + encodeURIComponent(item.detailUrl || '');
+            }
+
+            function tsRenderSuggestionStrip(containerId, titleId, items, kind) {
+                var page = tsPage();
+                var container = page.querySelector('#' + containerId);
+                var title = page.querySelector('#' + titleId);
+                if (!container || !title) { return 0; }
+
+                if (!items || !items.length) {
+                    container.innerHTML = '';
+                    container.style.display = 'none';
+                    title.style.display = 'none';
+                    return 0;
+                }
+
+                container.style.display = '';
+                title.style.display = '';
+                container.innerHTML = items.map(function (item, index) {
+                    var poster = tsSuggestionPoster(item);
+                    var meta = [item.sourceName, item.resolution || item.category]
+                        .filter(function (value) { return !!value; })
+                        .join(' · ');
+
+                    return '<div class="ts-sug" data-sug="' + kind + ':' + index + '" title="'
+                        + tsEscape(item.title || '') + '">'
+                        + '<div class="ts-sug-poster">'
+                        + (poster
+                            ? '<img loading="lazy" src="' + tsEscape(poster)
+                                + '" alt="" onerror="this.remove()" />'
+                            : '🎞')
+                        + (item.detailUrl
+                            ? '<a class="ts-sug-open" href="' + tsEscape(item.detailUrl)
+                                + '" target="_blank" rel="noopener" title="Abrir en la web">↗</a>'
+                            : '')
+                        + '</div>'
+                        + '<div class="ts-sug-title">' + tsEscape(item.title || '')
+                        + (item.year ? ' (' + item.year + ')' : '') + '</div>'
+                        + '<div class="ts-sug-meta">' + tsEscape(meta) + '</div>'
+                        + '</div>';
+                }).join('');
+
+                return items.length;
+            }
+
+            function tsRenderSuggestions(data) {
+                var page = tsPage();
+                var status = page.querySelector('#tsSuggestStatus');
+                var empty = page.querySelector('#tsSuggestEmpty');
+
+                TS.suggestions = {
+                    movies: (data && data.movies) || [],
+                    series: (data && data.series) || []
+                };
+
+                var movies = tsRenderSuggestionStrip(
+                    'tsSuggestMovies', 'tsSuggestMoviesTitle', TS.suggestions.movies, 'movies');
+                var series = tsRenderSuggestionStrip(
+                    'tsSuggestSeries', 'tsSuggestSeriesTitle', TS.suggestions.series, 'series');
+
+                if (status) {
+                    status.textContent = movies + series > 0
+                        ? ((data && data.cached) ? 'En caché' : 'Actualizado ahora')
+                        : '';
+                }
+
+                if (!empty) { return; }
+                if (movies + series > 0) {
+                    empty.style.display = 'none';
+                    return;
+                }
+
+                var errors = ((data && data.sources) || [])
+                    .filter(function (source) { return !!source.error; })
+                    .map(function (source) { return source.name + ' (' + source.error + ')'; });
+
+                empty.style.display = '';
+                empty.textContent = errors.length
+                    ? 'No hay novedades: ' + errors.join(' · ')
+                    : 'Las fuentes no devolvieron novedades. Revisa su URL de novedades en la configuración.';
+            }
+
+            function tsLoadSuggestions(refresh) {
+                var page = tsPage();
+                var box = page.querySelector('#tsSuggest');
+                if (!box) { return; }
+
+                if (TS.config && TS.config.dailySuggestionsEnabled === false) {
+                    box.style.display = 'none';
+                    return;
+                }
+
+                if (!refresh && (TS.suggestions.movies.length || TS.suggestions.series.length)) {
+                    return;
+                }
+
+                box.style.display = '';
+                page.querySelector('#tsSuggestStatus').textContent = refresh ? 'Actualizando…' : 'Cargando…';
+                page.querySelector('#tsSuggestRefresh').disabled = true;
+
+                tsFetch('Torrent/api/suggestions' + (refresh ? '?refresh=1' : ''), { method: 'GET' })
+                    .then(tsRenderSuggestions)
+                    .catch(function (err) {
+                        page.querySelector('#tsSuggestStatus').textContent = '';
+                        var empty = page.querySelector('#tsSuggestEmpty');
+                        if (!empty) { return; }
+                        empty.style.display = '';
+                        empty.textContent = 'No se pudieron cargar las sugerencias: ' + err.message;
+                    })
+                    .then(function () {
+                        page.querySelector('#tsSuggestRefresh').disabled = false;
+                    });
+            }
+
+            function tsSearchSuggestion(item) {
+                if (!item || !item.title) { return; }
+                var page = tsPage();
+                page.querySelector('#tsQuery').value = item.title;
+                tsSearch();
+                var status = page.querySelector('#tsStatus');
+                if (status && status.scrollIntoView) {
+                    status.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
             }
 
             function tsRenderSources(sources) {
@@ -545,7 +770,9 @@
 
                 add('Título', item.title);
                 add('Año', item.year);
-                add('Tipo', item.kind === 'series' ? 'Serie' : (item.kind === 'movie' ? 'Película' : ''));
+                add('Tipo', (item.kind === 'Series' || item.kind === 2)
+                    ? 'Serie'
+                    : ((item.kind === 'Movie' || item.kind === 1) ? 'Película' : ''));
                 add('Episodio', item.episodeText);
                 add('Release', item.releaseName);
                 add('Idiomas', item.languageText || (item.languages || []).map(function (l) {
@@ -724,6 +951,19 @@
                 });
 
                 page.addEventListener('click', function (event) {
+                    if (event.target.closest('.ts-sug-open')) {
+                        return;
+                    }
+
+                    var suggestion = event.target.closest('.ts-sug');
+                    if (suggestion) {
+                        var parts = (suggestion.getAttribute('data-sug') || '').split(':');
+                        var list = parts[0] === 'series' ? TS.suggestions.series : TS.suggestions.movies;
+                        var picked = list && list[parseInt(parts[1], 10)];
+                        if (picked) { tsSearchSuggestion(picked); }
+                        return;
+                    }
+
                     var langChip = event.target.closest('.ts-chip[data-lang]');
                     if (langChip) {
                         var lang = langChip.getAttribute('data-lang');
@@ -768,8 +1008,22 @@
 
                 page.querySelector('#tsManualSend').addEventListener('click', tsManualSend);
 
+                page.querySelector('#tsSuggestRefresh').addEventListener('click', function () {
+                    tsLoadSuggestions(true);
+                });
+
                 var stored = '';
                 try { stored = window.localStorage.getItem('torrentSearchQuery') || ''; } catch (e) { stored = ''; }
+
+                var fromQuery = '';
+                try {
+                    fromQuery = new URLSearchParams(window.location.search || '').get('q') || '';
+                } catch (e) { fromQuery = ''; }
+
+                if (fromQuery) {
+                    stored = fromQuery;
+                }
+
                 if (stored) {
                     page.querySelector('#tsQuery').value = stored;
                 }
@@ -782,7 +1036,7 @@
                     }
                 });
 
-                if (typeof ApiClient !== 'undefined' && ApiClient.getCurrentUser) {
+                if (!window.TS_STANDALONE && typeof ApiClient !== 'undefined' && ApiClient.getCurrentUser) {
                     ApiClient.getCurrentUser().then(function (user) {
                         if (user && user.Policy && user.Policy.IsAdministrator) {
                             page.querySelector('#tsConfigBtn').style.display = '';
@@ -791,6 +1045,11 @@
                 }
 
                 tsLoadConfig();
+
+                if (fromQuery && page.dataset.tsAuto !== '1') {
+                    page.dataset.tsAuto = '1';
+                    setTimeout(tsSearch, 350);
+                }
             }
 
             function tsOnShow() {

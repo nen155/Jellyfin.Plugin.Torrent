@@ -128,6 +128,18 @@ public class PublicConfig
     /// <summary>Gets or sets el límite de fichas de detalle por búsqueda.</summary>
     public int DetailFetchLimit { get; set; }
 
+    /// <summary>Gets or sets a value indicating whether hay sugerencias del día.</summary>
+    public bool DailySuggestionsEnabled { get; set; }
+
+    /// <summary>Gets or sets cuántas sugerencias se muestran por tipo.</summary>
+    public int DailySuggestionsCount { get; set; }
+
+    /// <summary>Gets or sets a value indicating whether se añade la fila de sugerencias al inicio.</summary>
+    public bool DailySuggestionsHomeRow { get; set; }
+
+    /// <summary>Gets or sets a value indicating whether se añade el botón flotante.</summary>
+    public bool DailySuggestionsWebButton { get; set; }
+
     /// <summary>Gets or sets la versión del plugin.</summary>
     public string Version { get; set; } = string.Empty;
 }

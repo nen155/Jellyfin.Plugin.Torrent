@@ -161,6 +161,32 @@ public class TorrentSourceConfig
     /// <summary>Gets or sets el selector del idioma indicado por la web.</summary>
     public string? LanguageSelector { get; set; }
 
+    // ------------------- Novedades (sugerencias del día) -------------------
+
+    /// <summary>
+    /// Gets or sets la URL de la lista de novedades de películas. Admite
+    /// <c>{base}</c> y <c>{page}</c>.
+    /// </summary>
+    public string? LatestMoviesUrl { get; set; }
+
+    /// <summary>Gets or sets la URL de la lista de novedades de series.</summary>
+    public string? LatestSeriesUrl { get; set; }
+
+    /// <summary>
+    /// Gets or sets el selector de cada elemento de la lista de novedades
+    /// (vacío = el mismo que la búsqueda).
+    /// </summary>
+    public string? LatestRowSelector { get; set; }
+
+    /// <summary>Gets or sets el selector del título en las novedades.</summary>
+    public string? LatestTitleSelector { get; set; }
+
+    /// <summary>Gets or sets el selector del enlace en las novedades.</summary>
+    public string? LatestLinkSelector { get; set; }
+
+    /// <summary>Gets or sets el selector de la carátula en las novedades.</summary>
+    public string? LatestPosterSelector { get; set; }
+
     // ------------------------ Ficha de detalle ------------------------
 
     /// <summary>
@@ -273,6 +299,12 @@ public class TorrentSourceConfig
         PosterSelector = PosterSelector,
         CategorySelector = CategorySelector,
         LanguageSelector = LanguageSelector,
+        LatestMoviesUrl = LatestMoviesUrl,
+        LatestSeriesUrl = LatestSeriesUrl,
+        LatestRowSelector = LatestRowSelector,
+        LatestTitleSelector = LatestTitleSelector,
+        LatestLinkSelector = LatestLinkSelector,
+        LatestPosterSelector = LatestPosterSelector,
         FetchDetails = FetchDetails,
         DetailMagnetSelector = DetailMagnetSelector,
         DetailTorrentSelector = DetailTorrentSelector,

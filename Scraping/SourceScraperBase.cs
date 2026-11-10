@@ -129,6 +129,14 @@ public abstract class SourceScraperBase
     }
 
     /// <summary>
+    /// Devuelve el primer valor con contenido (para heredar selectores).
+    /// </summary>
+    /// <param name="values">Valores en orden de preferencia.</param>
+    /// <returns>El primero no vacío o null.</returns>
+    protected static string? FirstNonEmpty(params string?[] values) =>
+        values.FirstOrDefault(v => !string.IsNullOrWhiteSpace(v));
+
+    /// <summary>
     /// Aplica los metadatos deducidos del nombre del release.
     /// </summary>
     /// <param name="result">Resultado.</param>

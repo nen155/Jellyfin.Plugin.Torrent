@@ -325,6 +325,11 @@ public static class SelectorReader
             return text.Length == 0 ? null : text;
         }
 
+        if (attribute.Equals("ownText", StringComparison.OrdinalIgnoreCase))
+        {
+            return ReadOwnText(element);
+        }
+
         if (attribute.Equals("html", StringComparison.OrdinalIgnoreCase))
         {
             return element.InnerHtml;
@@ -424,6 +429,10 @@ public static class SelectorReader
                 {
                     value = TextUtil.Clean(element.TextContent);
                 }
+                else if (attribute.Equals("ownText", StringComparison.OrdinalIgnoreCase))
+                {
+                    value = ReadOwnText(element);
+                }
                 else if (attribute.Equals("html", StringComparison.OrdinalIgnoreCase))
                 {
                     value = element.InnerHtml;
@@ -448,8 +457,18 @@ public static class SelectorReader
         return values;
     }
 
-    private static (string Selector, string? Attribute) Split(string spec)
+    /// <summary>
+    /// Lee solo el texto propio del elemento, sin el de sus hijos
+    /// (<c>.title@ownText</c> evita que se pegue el texto de <c>.episode</c>).
+    /// </summary>
+    private static string? ReadOwnText(IElement element)
     {
+        var text = TextUtil.Clean(string.Concat(
+            element.ChildNodes.OfType<IText>().Select(node => node.Text)));
+        return text.Length == 0 ? null : text;
+    }
+
+    private static (string Selector, string? Attribute) Split(string spec)    {
         var trimmed = spec.Trim();
         var index = trimmed.LastIndexOf('@');
         if (index <= 0)

@@ -28,14 +28,30 @@ public sealed class TorznabSourceScraper : SourceScraperBase, ISourceScraper
     public SourceKind Kind => SourceKind.Torznab;
 
     /// <inheritdoc />
-    public async Task<SourceSearchResult> SearchAsync(
+    public Task<SourceSearchResult> SearchAsync(
         TorrentSourceConfig source,
         string baseUrl,
+        string query,
+        CancellationToken cancellationToken) =>
+        RunAsync(source, baseUrl, source.SearchUrl, query, cancellationToken);
+
+    /// <inheritdoc />
+    public Task<SourceSearchResult> BrowseAsync(
+        TorrentSourceConfig source,
+        string baseUrl,
+        string urlTemplate,
+        CancellationToken cancellationToken) =>
+        RunAsync(source, baseUrl, urlTemplate, string.Empty, cancellationToken);
+
+    private async Task<SourceSearchResult> RunAsync(
+        TorrentSourceConfig source,
+        string baseUrl,
+        string urlTemplate,
         string query,
         CancellationToken cancellationToken)
     {
         var outcome = new SourceSearchResult();
-        var url = BuildUrl(source.SearchUrl, baseUrl, query, 1);
+        var url = BuildUrl(urlTemplate, baseUrl, query, 1);
         if (url is null)
         {
             outcome.Error = "La URL Torznab no es válida.";

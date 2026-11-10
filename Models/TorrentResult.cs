@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace Jellyfin.Plugin.Torrent.Models;
 
 /// <summary>
@@ -78,6 +80,7 @@ public class TorrentResult
     public string? Category { get; set; }
 
     /// <summary>Gets or sets el tipo de contenido deducido.</summary>
+    [JsonConverter(typeof(JsonStringEnumConverter))]
     public MediaKind Kind { get; set; }
 
     /// <summary>Gets or sets los idiomas detectados (es, en, multi…).</summary>

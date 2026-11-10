@@ -43,6 +43,13 @@ retos anti-bot y pulsar los botones de descarga protegidos.
 - **Plantillas** listas: Nyaa, WatchSoMuch, DonTorrent, 1337x, YTS, Torznab,
   genérica HTML y genérica JSON. **WatchSoMuch y DonTorrent vienen ya
   configuradas y activadas** de fábrica.
+- **Sugerencias del día**: previsualización de los últimos estrenos de
+  películas y series, leídos de las listas de novedades de las fuentes y
+  cacheados para no golpear las webs en cada visita.
+- **Disponible para todos los clientes**: el buscador se sirve también en
+  `/Torrent/` y el plugin añade un botón flotante y una fila de sugerencias a
+  la interfaz web de Jellyfin, así que cualquier usuario (no solo el
+  administrador) puede usarlo.
 
 ## Instalación
 
@@ -61,6 +68,55 @@ Páginas disponibles:
 
 - **Buscar torrents** (menú lateral del panel).
 - **Torrent Search** (Panel → Plugins → Torrent Search → Ajustes).
+- **`/Torrent/`** (cualquier usuario): el mismo buscador con las sugerencias
+  del día, sin pasar por el panel.
+
+## Sugerencias del día
+
+La página de búsqueda (y el inicio de la web de Jellyfin) muestra una
+previsualización de los **últimos estrenos** de películas y series. Cada
+fuente aporta sus novedades a partir de dos URLs opcionales:
+
+| Campo | Ejemplo | Notas |
+|---|---|---|
+| URL de novedades: películas | `{base}/peliculas` | Admite `{base}` y `{page}` |
+| URL de novedades: series | `{base}/series` | |
+| Selector de fila (novedades) | `.noticiasContent a[href*='/pelicula/'], .noticiasContent a[href*='/serie/']` | Vacío = el de la búsqueda |
+| Selector del título | `.header .title@ownText` | `@ownText` ignora el texto de los hijos |
+| Selector del enlace | `@self@href` | Si la fila ya es el enlace |
+| Selector de la carátula | `img@src` | |
+
+Los selectores que dejes vacíos heredan los de la búsqueda, así que muchas
+webs solo necesitan las dos URLs. Si la lista solo muestra carátulas, el
+título se deduce del slug del enlace (`/pelicula/31220/Un-buen-abogado`).
+
+Ajustes globales (pestaña **General**):
+
+- **Mostrar las sugerencias del día**: activa o desactiva la función.
+- **Sugerencias por tipo** y **minutos de caché** (por defecto 12 h).
+- **Añadir la fila «Sugerencias del día» al inicio de la web**.
+- **Añadir el botón flotante «Torrents» a la web**.
+
+En el editor de cada fuente, el botón **«Probar novedades»** guarda la fuente y
+muestra lo que devuelve su lista de novedades, con el error o el diagnóstico
+si no encuentra nada.
+
+WatchSoMuch (`/Movies/` y `/Movies/Series/`) y DonTorrent (`/peliculas` y
+`/series`) traen sus URLs configuradas; en instalaciones existentes se
+rellenan solas la primera vez que se abre el plugin.
+
+## Acceso desde los clientes
+
+- **`/Torrent/`**: página completa (buscador + sugerencias) que funciona sin el
+  panel. Usa la sesión de Jellyfin del navegador; si no la hay, pide iniciar
+  sesión en la web.
+- **Botón flotante «Torrents»**: se inyecta en `index.html` de jellyfin-web,
+  visible para todos los usuarios.
+- **Fila «Sugerencias del día»** en la pantalla de inicio de jellyfin-web. Al
+  pulsar una carátula se abre el buscador con ese título listo para buscar.
+
+Ambas inyecciones se pueden desactivar en la configuración y solo se aplican
+cuando el plugin está activo.
 
 ## Configurar una fuente HTML
 
@@ -163,7 +219,10 @@ Al pulsar **Descargar**:
 
 ## Uso del buscador
 
-Caja de búsqueda + filtros (tipo, calidad, semillas mínimas, orden e idioma),
+Arriba se muestran las **sugerencias del día** (películas y series): pulsa una
+carátula para buscar ese título, o el enlace «↗» para abrir su ficha en la web.
+Después, caja de búsqueda + filtros (tipo, calidad, semillas mínimas, orden e
+idioma),
 selector de fuentes, tarjetas con carátula y metadatos, ficha completa con
 sinopsis, pares de datos, info-hash, **lista de archivos del .torrent** y
 botones para enviar al cliente, abrir el magnet, descargar el `.torrent` o abrir
@@ -171,12 +230,16 @@ la ficha original. También hay **Enlace manual** para pegar magnets o URLs.
 
 ## API
 
-Todo cuelga de `/Torrent/api` y requiere sesión de Jellyfin. (admin) = solo
-administradores.
+Las rutas de la API cuelgan de `/Torrent/api` y requieren sesión de Jellyfin.
+(admin) = solo administradores.
 
 | Método | Ruta | Descripción |
 |---|---|---|
+| GET | `/Torrent/` | Página del buscador con sugerencias (cualquier usuario) |
+| GET | `/Torrent/inject.js` | Botón y fila de sugerencias para jellyfin-web |
 | GET | `/config` | Fuentes y ajustes para la interfaz |
+| GET | `/suggestions` | Sugerencias del día (`?refresh=1` fuerza la lectura) |
+| GET | `/suggestions/test?sourceId=` (admin) | Novedades de una fuente con diagnóstico |
 | POST | `/search` | Búsqueda agregada |
 | POST | `/add` | Envía un magnet/.torrent al cliente (acepta `resultId` para usar la sesión del navegador) |
 | GET | `/image?u=&r=` | Proxy de carátulas con caché |

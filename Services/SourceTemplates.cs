@@ -117,7 +117,8 @@ public static class SourceTemplates
             Verified = true,
             Description = "Búsqueda y metadatos en español. El botón de descarga está protegido con "
                 + "proof-of-work: la ficha se abre con el navegador headless, se pulsa el botón y el plugin "
-                + "captura el .torrent resultante con las cookies de la sesión.",
+                + "captura el .torrent resultante con las cookies de la sesión. Trae configuradas las "
+                + "listas de novedades de películas y series para las sugerencias del día.",
             Source = new TorrentSourceConfig
             {
                 Name = "DonTorrent",
@@ -130,6 +131,12 @@ public static class SourceTemplates
                 TitleSelector = "a.search-result-link",
                 LinkSelector = "a.search-result-link@href",
                 CategorySelector = ".badge",
+                LatestMoviesUrl = "{base}/peliculas",
+                LatestSeriesUrl = "{base}/series",
+                LatestRowSelector = ".noticiasContent a[href*='/pelicula/'], .noticiasContent a[href*='/serie/']",
+                LatestTitleSelector = "@self",
+                LatestLinkSelector = "@self@href",
+                LatestPosterSelector = "img@src",
                 FetchDetails = true,
                 DetailFetchMode = FetchMode.Browser,
                 DetailBrowserWaitMs = 9000,
@@ -151,7 +158,8 @@ public static class SourceTemplates
             Name = "WatchSoMuch",
             Verified = true,
             Description = "Buscador 100 % JavaScript: necesita el navegador headless. La ficha enlaza a una "
-                + "página de descarga por calidad; el plugin las abre y extrae el magnet de cada una.",
+                + "página de descarga por calidad; el plugin las abre y extrae el magnet de cada una. Trae "
+                + "configuradas las listas de novedades de películas y series para las sugerencias del día.",
             Source = new TorrentSourceConfig
             {
                 Name = "WatchSoMuch",
@@ -169,6 +177,10 @@ public static class SourceTemplates
                 LanguageSelector = ".language@title",
                 DateSelector = ".releaseDate@title",
                 CompletedSelector = ".downloads@title",
+                LatestMoviesUrl = "{base}/Movies/",
+                LatestSeriesUrl = "{base}/Movies/Series/",
+                LatestTitleSelector = ".header .title@ownText",
+                LatestPosterSelector = "a.thumbnailHolder img@src",
                 FetchDetails = true,
                 DetailFetchMode = FetchMode.Http,
                 DetailTorrentSelector = "a[href*='/Download-']@href",

@@ -21,6 +21,11 @@ public class PluginConfiguration : BasePluginConfiguration
         ProxyImages = true;
         CacheMinutes = 10;
         DetailFetchLimit = 12;
+        DailySuggestionsEnabled = true;
+        DailySuggestionsCount = 12;
+        DailySuggestionsCacheMinutes = 720;
+        DailySuggestionsHomeRow = true;
+        DailySuggestionsWebButton = true;
         BlockedKeywords = new List<string>();
         Sources = new List<Models.TorrentSourceConfig>();
         DownloadClient = new Models.DownloadClientConfig
@@ -65,6 +70,30 @@ public class PluginConfiguration : BasePluginConfiguration
     /// <summary>Gets or sets palabras que descartan un resultado.</summary>
     public List<string> BlockedKeywords { get; set; }
 
+    /// <summary>
+    /// Gets or sets a value indicating whether se muestran las sugerencias del
+    /// día (estrenos de las fuentes) en el buscador y en la web.
+    /// </summary>
+    public bool DailySuggestionsEnabled { get; set; }
+
+    /// <summary>Gets or sets cuántas sugerencias se muestran por tipo.</summary>
+    public int DailySuggestionsCount { get; set; }
+
+    /// <summary>Gets or sets los minutos que se cachea la lista de sugerencias.</summary>
+    public int DailySuggestionsCacheMinutes { get; set; }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether se añade una fila de sugerencias
+    /// a la pantalla de inicio de jellyfin-web.
+    /// </summary>
+    public bool DailySuggestionsHomeRow { get; set; }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether se añade un botón flotante a
+    /// jellyfin-web para abrir el buscador desde cualquier cliente.
+    /// </summary>
+    public bool DailySuggestionsWebButton { get; set; }
+
     /// <summary>Gets or sets las fuentes configuradas.</summary>
     public List<Models.TorrentSourceConfig> Sources { get; set; }
 
@@ -73,6 +102,12 @@ public class PluginConfiguration : BasePluginConfiguration
 
     /// <summary>Gets or sets la configuración del navegador headless.</summary>
     public Models.BrowserConfig Browser { get; set; }
+
+    /// <summary>Gets el identificador fijo de la fuente WatchSoMuch por defecto.</summary>
+    public static Guid WatchSoMuchSourceId { get; } = Guid.Parse("7a3f1c92-5b6e-4d21-9c8a-1e4f7b2d6a01");
+
+    /// <summary>Gets el identificador fijo de la fuente DonTorrent por defecto.</summary>
+    public static Guid DonTorrentSourceId { get; } = Guid.Parse("4d8e2b71-9a3c-4f65-8b1d-2c7e9a5f3b02");
 
     /// <summary>
     /// Fuentes que se añaden la primera vez (WatchSoMuch y DonTorrent), con
@@ -83,8 +118,8 @@ public class PluginConfiguration : BasePluginConfiguration
     {
         var defaults = new Dictionary<string, Guid>(StringComparer.Ordinal)
         {
-            ["watchsomuch"] = Guid.Parse("7a3f1c92-5b6e-4d21-9c8a-1e4f7b2d6a01"),
-            ["dontorrent"] = Guid.Parse("4d8e2b71-9a3c-4f65-8b1d-2c7e9a5f3b02")
+            ["watchsomuch"] = WatchSoMuchSourceId,
+            ["dontorrent"] = DonTorrentSourceId
         };
 
         var sources = new List<Models.TorrentSourceConfig>();

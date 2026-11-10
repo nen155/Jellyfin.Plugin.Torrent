@@ -43,6 +43,21 @@ public interface ISourceScraper
         CancellationToken cancellationToken);
 
     /// <summary>
+    /// Lee la lista de novedades (estrenos) de la fuente, sin consulta de
+    /// búsqueda. Se usa para las sugerencias del día.
+    /// </summary>
+    /// <param name="source">Configuración de la fuente.</param>
+    /// <param name="baseUrl">URL base efectiva (tras resolver el dominio).</param>
+    /// <param name="urlTemplate">Plantilla de la URL de novedades ({base}, {page}).</param>
+    /// <param name="cancellationToken">Token de cancelación.</param>
+    /// <returns>Resultados o error.</returns>
+    Task<SourceSearchResult> BrowseAsync(
+        TorrentSourceConfig source,
+        string baseUrl,
+        string urlTemplate,
+        CancellationToken cancellationToken);
+
+    /// <summary>
     /// Completa un resultado con los datos de su ficha de detalle.
     /// </summary>
     /// <param name="source">Configuración de la fuente.</param>

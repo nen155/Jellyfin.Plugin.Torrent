@@ -162,6 +162,49 @@ public static partial class TextUtil
     }
 
     /// <summary>
+    /// Deduce un título legible a partir del último segmento de una URL
+    /// (<c>/pelicula/31220/Un-buen-abogado</c> → <c>Un buen abogado</c>).
+    /// </summary>
+    /// <param name="url">URL o ruta.</param>
+    /// <returns>Título legible o null si el segmento no sirve como título.</returns>
+    public static string? TitleFromUrl(string? url)
+    {
+        if (string.IsNullOrWhiteSpace(url))
+        {
+            return null;
+        }
+
+        var path = url.Trim();
+        var cut = path.IndexOfAny(['?', '#']);
+        if (cut >= 0)
+        {
+            path = path[..cut];
+        }
+
+        var segment = path.TrimEnd('/').Split('/').LastOrDefault();
+        if (string.IsNullOrWhiteSpace(segment))
+        {
+            return null;
+        }
+
+        segment = Uri.UnescapeDataString(segment);
+
+        var dot = segment.LastIndexOf('.');
+        if (dot > 0 && segment.Length - dot <= 5)
+        {
+            segment = segment[..dot];
+        }
+
+        var words = Clean(segment.Replace('-', ' ').Replace('_', ' '));
+        if (words.Length < 2 || words.All(c => char.IsDigit(c) || c == ' '))
+        {
+            return null;
+        }
+
+        return char.ToUpperInvariant(words[0]) + words[1..];
+    }
+
+    /// <summary>
     /// Convierte un texto en un slug apto para URL.
     /// </summary>
     /// <param name="value">Texto.</param>

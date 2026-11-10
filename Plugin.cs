@@ -14,6 +14,8 @@ namespace Jellyfin.Plugin.Torrent;
 /// </summary>
 public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
 {
+    private int _latestDefaultsApplied;
+
     /// <summary>
     /// Initializes a new instance of the <see cref="Plugin"/> class.
     /// </summary>
@@ -38,6 +40,63 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
     /// Gets the current plugin instance.
     /// </summary>
     public static Plugin? Instance { get; private set; }
+
+    /// <summary>
+    /// Rellena las URLs de novedades de las fuentes incluidas (WatchSoMuch y
+    /// DonTorrent) cuando todavía no están configuradas, para que las
+    /// sugerencias del día funcionen también al actualizar el plugin.
+    /// </summary>
+    public void EnsureLatestDefaults()
+    {
+        if (Volatile.Read(ref _latestDefaultsApplied) == 1 || Configuration.Sources.Count == 0)
+        {
+            return;
+        }
+
+        if (Interlocked.Exchange(ref _latestDefaultsApplied, 1) == 1)
+        {
+            return;
+        }
+
+        var templates = Services.SourceTemplates.All().ToDictionary(t => t.Key, StringComparer.Ordinal);
+        var known = new Dictionary<Guid, string>
+        {
+            [PluginConfiguration.WatchSoMuchSourceId] = "watchsomuch",
+            [PluginConfiguration.DonTorrentSourceId] = "dontorrent"
+        };
+
+        var changed = false;
+        foreach (var source in Configuration.Sources)
+        {
+            if (!known.TryGetValue(source.Id, out var key)
+                || !templates.TryGetValue(key, out var template)
+                || !IsLatestEmpty(source))
+            {
+                continue;
+            }
+
+            source.LatestMoviesUrl = template.Source.LatestMoviesUrl;
+            source.LatestSeriesUrl = template.Source.LatestSeriesUrl;
+            source.LatestRowSelector = template.Source.LatestRowSelector;
+            source.LatestTitleSelector = template.Source.LatestTitleSelector;
+            source.LatestLinkSelector = template.Source.LatestLinkSelector;
+            source.LatestPosterSelector = template.Source.LatestPosterSelector;
+            changed = true;
+        }
+
+        if (changed)
+        {
+            SaveConfiguration();
+        }
+    }
+
+    private static bool IsLatestEmpty(Models.TorrentSourceConfig source) =>
+        string.IsNullOrWhiteSpace(source.LatestMoviesUrl)
+        && string.IsNullOrWhiteSpace(source.LatestSeriesUrl)
+        && string.IsNullOrWhiteSpace(source.LatestRowSelector)
+        && string.IsNullOrWhiteSpace(source.LatestTitleSelector)
+        && string.IsNullOrWhiteSpace(source.LatestLinkSelector)
+        && string.IsNullOrWhiteSpace(source.LatestPosterSelector);
 
     /// <inheritdoc />
     public override string Name => "Torrent Search";

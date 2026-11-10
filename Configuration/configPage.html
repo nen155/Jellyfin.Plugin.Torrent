@@ -86,12 +86,16 @@
                 <h1 style="margin-bottom:.25rem">Torrent Search</h1>
                 <div class="fieldDescription">
                     Meta-buscador: consulta las webs que configures, extrae sus enlaces y los envía al cliente
-                    de torrents. La página de búsqueda está en el menú lateral del panel.
+                    de torrents. La página de búsqueda está en el menú lateral del panel y en
+                    <code>/Torrent/</code> para cualquier usuario.
                 </div>
 
                 <div class="tc-row">
                     <button is="emby-button" type="button" id="tcOpenSearch" class="raised">
                         <span>Abrir el buscador</span>
+                    </button>
+                    <button is="emby-button" type="button" id="tcOpenStandalone" class="raised">
+                        <span>Abrir la página para clientes</span>
                     </button>
                 </div>
 
@@ -156,6 +160,52 @@
                         <div class="tc-hint">
                             Los resultados que contengan alguna de estas palabras se descartan
                             (por ejemplo: cam, ts, screener).
+                        </div>
+                    </div>
+
+                    <h3>Sugerencias del día</h3>
+                    <div class="fieldDescription">
+                        Previsualización de los últimos estrenos de películas y series de las fuentes
+                        activas. Cada fuente necesita su URL de novedades (pestaña «Fuentes» →
+                        «Sugerencias del día»).
+                    </div>
+
+                    <div class="checkboxContainer checkboxContainer-withDescription">
+                        <label>
+                            <input is="emby-toggle" type="checkbox" id="tcSuggestEnabled" />
+                            <span>Mostrar las sugerencias del día</span>
+                        </label>
+                    </div>
+
+                    <div class="tc-grid2">
+                        <div class="tc-field">
+                            <label for="tcSuggestCount">Sugerencias por tipo</label>
+                            <input type="number" id="tcSuggestCount" min="1" max="60" />
+                        </div>
+                        <div class="tc-field">
+                            <label for="tcSuggestCache">Minutos de caché</label>
+                            <input type="number" id="tcSuggestCache" min="5" max="1440" />
+                        </div>
+                    </div>
+
+                    <div class="checkboxContainer checkboxContainer-withDescription">
+                        <label>
+                            <input is="emby-toggle" type="checkbox" id="tcSuggestHomeRow" />
+                            <span>Añadir la fila «Sugerencias del día» al inicio de la web</span>
+                        </label>
+                        <div class="fieldDescription checkboxFieldDescription">
+                            Se inyecta en jellyfin-web para todos los usuarios, no solo para el administrador.
+                        </div>
+                    </div>
+
+                    <div class="checkboxContainer checkboxContainer-withDescription">
+                        <label>
+                            <input is="emby-toggle" type="checkbox" id="tcSuggestWebButton" />
+                            <span>Añadir el botón flotante «Torrents» a la web</span>
+                        </label>
+                        <div class="fieldDescription checkboxFieldDescription">
+                            Abre el buscador completo (y las sugerencias) en <code>/Torrent/</code> desde
+                            cualquier cliente basado en la web de Jellyfin.
                         </div>
                     </div>
                 </div>
@@ -382,6 +432,30 @@
                 { key: 'LanguageSelector', label: 'Selector del idioma', section: 'html', type: 'text' },
                 { key: 'CompletedSelector', label: 'Selector de descargas completadas', section: 'html', type: 'text' },
                 {
+                    key: 'LatestMoviesUrl', label: 'URL de novedades: películas', section: 'novedades', type: 'text',
+                    hint: 'Admite {base}. Ej.: {base}/peliculas'
+                },
+                {
+                    key: 'LatestSeriesUrl', label: 'URL de novedades: series', section: 'novedades', type: 'text',
+                    hint: 'Ej.: {base}/series'
+                },
+                {
+                    key: 'LatestRowSelector', label: 'Selector de fila (novedades)', section: 'novedades', type: 'text',
+                    hint: 'Vacío = el mismo de la búsqueda. Admite varios selectores separados por comas.'
+                },
+                {
+                    key: 'LatestTitleSelector', label: 'Selector del título (novedades)', section: 'novedades', type: 'text',
+                    hint: 'Vacío = el de la búsqueda. Usa @ownText para ignorar el texto de los hijos.'
+                },
+                {
+                    key: 'LatestLinkSelector', label: 'Selector del enlace (novedades)', section: 'novedades', type: 'text',
+                    hint: 'Vacío = el de la búsqueda. Usa @self@href si la fila ya es el enlace.'
+                },
+                {
+                    key: 'LatestPosterSelector', label: 'Selector de la carátula (novedades)', section: 'novedades', type: 'text',
+                    hint: 'Vacío = el de la búsqueda.'
+                },
+                {
                     key: 'FetchDetails', label: 'Visitar la ficha de detalle', section: 'detalle', type: 'checkbox',
                     hint: 'Necesario si los enlaces o la carátula solo están en la ficha.'
                 },
@@ -440,6 +514,7 @@
                 ['basico', 'Básico'],
                 ['busqueda', 'Búsqueda'],
                 ['html', 'Extracción HTML'],
+                ['novedades', 'Sugerencias del día (novedades)'],
                 ['detalle', 'Ficha de detalle'],
                 ['navegador', 'Navegador (JavaScript)'],
                 ['json', 'Extracción JSON'],
@@ -614,6 +689,12 @@
                     DelayMs: 300,
                     FetchDetails: false,
                     JsonFields: [],
+                    LatestMoviesUrl: '',
+                    LatestSeriesUrl: '',
+                    LatestRowSelector: '',
+                    LatestTitleSelector: '',
+                    LatestLinkSelector: '',
+                    LatestPosterSelector: '',
                     Domain: {
                         Provider: 'None', Url: '', Regex: '', DiscordBotToken: '',
                         DiscordChannelId: '', CacheMinutes: 60, AutoApply: true
@@ -657,6 +738,7 @@
                 var html = '<div class="tc-editor"><div class="tc-editor-head">'
                     + '<strong>Editar: ' + tcEscape(source.Name || '') + '</strong>'
                     + '<div><button is="emby-button" type="button" class="raised" id="tcEditorTest"><span>Guardar y probar</span></button> '
+                    + '<button is="emby-button" type="button" class="raised" id="tcEditorLatest"><span>Probar novedades</span></button> '
                     + '<button is="emby-button" type="button" class="raised" id="tcEditorDomain"><span>Resolver dominio</span></button> '
                     + '<button is="emby-button" type="button" class="raised" id="tcEditorClose"><span>Cerrar</span></button></div>'
                     + '</div>';
@@ -711,6 +793,36 @@
                     tcReadEditor();
                     tcSave().then(function () {
                         tcRunTest();
+                    });
+                });
+
+                host.querySelector('#tcEditorLatest').addEventListener('click', function () {
+                    tcReadEditor();
+                    var status = host.querySelector('#tcTestResult');
+                    var preview = host.querySelector('#tcTestPreview');
+                    var source = TC.config.Sources[TC.editingIndex];
+                    status.textContent = 'Leyendo las novedades de la fuente…';
+                    preview.innerHTML = '';
+
+                    tcSave().then(function () {
+                        return tcFetch('Torrent/api/suggestions/test?sourceId=' + encodeURIComponent(source.Id),
+                            { method: 'GET' });
+                    }).then(function (response) {
+                        var items = (response.movies || []).concat(response.series || []);
+                        var outcome = (response.sources || [])[0] || {};
+                        status.textContent = 'Novedades: ' + items.length
+                            + (outcome.error ? '\nError: ' + outcome.error : '')
+                            + (outcome.diagnostic ? '\nDiagnóstico: ' + outcome.diagnostic : '');
+
+                        preview.innerHTML = items.slice(0, 12).map(function (item) {
+                            return '<div class="tc-prev"><b>' + tcEscape(item.title || '') + '</b><br />'
+                                + (item.year ? tcEscape(String(item.year)) + ' · ' : '')
+                                + (item.category ? tcEscape(item.category) + ' · ' : '')
+                                + ((item.kind === 'Series' || item.kind === 2) ? 'serie' : 'película') + '<br />'
+                                + tcEscape(item.detailUrl || '') + '</div>';
+                        }).join('');
+                    }).catch(function (err) {
+                        status.textContent = 'Error: ' + err.message;
                     });
                 });
 
@@ -845,6 +957,11 @@
                 page.querySelector('#tcCache').value = config.CacheMinutes || 0;
                 page.querySelector('#tcUserAgent').value = config.UserAgent || '';
                 page.querySelector('#tcBlocked').value = (config.BlockedKeywords || []).join('\n');
+                page.querySelector('#tcSuggestEnabled').checked = config.DailySuggestionsEnabled !== false;
+                page.querySelector('#tcSuggestCount').value = config.DailySuggestionsCount || 12;
+                page.querySelector('#tcSuggestCache').value = config.DailySuggestionsCacheMinutes || 720;
+                page.querySelector('#tcSuggestHomeRow').checked = config.DailySuggestionsHomeRow !== false;
+                page.querySelector('#tcSuggestWebButton').checked = config.DailySuggestionsWebButton !== false;
             }
 
             function tcFillBrowser() {
@@ -888,6 +1005,12 @@
                 config.BlockedKeywords = page.querySelector('#tcBlocked').value.split(/\r?\n/)
                     .map(function (line) { return line.trim(); })
                     .filter(function (line) { return line.length > 0; });
+
+                config.DailySuggestionsEnabled = page.querySelector('#tcSuggestEnabled').checked;
+                config.DailySuggestionsCount = parseInt(page.querySelector('#tcSuggestCount').value, 10) || 12;
+                config.DailySuggestionsCacheMinutes = parseInt(page.querySelector('#tcSuggestCache').value, 10) || 720;
+                config.DailySuggestionsHomeRow = page.querySelector('#tcSuggestHomeRow').checked;
+                config.DailySuggestionsWebButton = page.querySelector('#tcSuggestWebButton').checked;
 
                 config.Browser = {
                     Mode: page.querySelector('#tcBrowserMode').value,
@@ -1056,6 +1179,10 @@
                     } else {
                         window.location.hash = '#/configurationpage?name=TorrentSearch';
                     }
+                });
+
+                page.querySelector('#tcOpenStandalone').addEventListener('click', function () {
+                    window.open(ApiClient.getUrl('Torrent/'), '_blank', 'noopener');
                 });
 
                 page.querySelector('#tcSave').addEventListener('click', function () {

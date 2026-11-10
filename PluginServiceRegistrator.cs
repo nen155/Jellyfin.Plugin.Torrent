@@ -28,6 +28,7 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator
         serviceCollection.AddSingleton<DomainResolverService>();
         serviceCollection.AddSingleton<SourceDiscoveryService>();
         serviceCollection.AddSingleton<TorrentSearchService>();
+        serviceCollection.AddSingleton<DailySuggestionsService>();
         serviceCollection.AddSingleton<ImageProxyService>();
         serviceCollection.AddSingleton<TorrentFileService>();
 

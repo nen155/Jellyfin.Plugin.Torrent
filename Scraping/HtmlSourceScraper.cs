@@ -117,12 +117,90 @@ public sealed class HtmlSourceScraper : SourceScraperBase, ISourceScraper
     }
 
     /// <inheritdoc />
+    public async Task<SourceSearchResult> BrowseAsync(
+        TorrentSourceConfig source,
+        string baseUrl,
+        string urlTemplate,
+        CancellationToken cancellationToken)
+    {
+        var outcome = new SourceSearchResult();
+        var url = BuildUrl(urlTemplate, baseUrl, string.Empty, 1);
+        if (url is null)
+        {
+            outcome.Error = "La URL de novedades no genera una dirección válida.";
+            return outcome;
+        }
+
+        var loaded = await Loader
+            .LoadAsync(source, url, null, null, cancellationToken)
+            .ConfigureAwait(false);
+
+        if (!loaded.Ok)
+        {
+            outcome.Error = loaded.Error;
+            return outcome;
+        }
+
+        if (loaded.StatusCode >= 400)
+        {
+            outcome.Error = $"La web respondió HTTP {loaded.StatusCode}.";
+            return outcome;
+        }
+
+        outcome.Engine = loaded.Engine;
+
+        var document = await Loader.ParseHtmlAsync(loaded.Html, cancellationToken)
+            .ConfigureAwait(false);
+
+        var rowSelector = FirstNonEmpty(source.LatestRowSelector, source.RowSelector);
+        var rows = SelectRows(document, rowSelector);
+        if (rows.Count == 0)
+        {
+            outcome.Error = string.IsNullOrWhiteSpace(rowSelector)
+                ? "Falta el selector de fila de las novedades."
+                : $"El selector de fila de las novedades no encontró elementos (motor: {loaded.Engine}).";
+            outcome.Diagnostic = DetailEnricher.BuildDiagnostic(document);
+            return outcome;
+        }
+
+        var mapper = WithLatestSelectors(source);
+        foreach (var row in rows)
+        {
+            var result = MapRow(row, mapper, loaded.FinalUrl);
+            if (result is not null)
+            {
+                outcome.Results.Add(result);
+            }
+        }
+
+        return outcome;
+    }
+
+    /// <inheritdoc />
     public Task<IReadOnlyList<TorrentResult>> EnrichAsync(
         TorrentSourceConfig source,
         string baseUrl,
         TorrentResult result,
         CancellationToken cancellationToken) =>
         DetailEnricher.EnrichAsync(Loader, source, result, _sessions, Logger, cancellationToken);
+
+    private static TorrentSourceConfig WithLatestSelectors(TorrentSourceConfig source)
+    {
+        if (string.IsNullOrWhiteSpace(source.LatestRowSelector)
+            && string.IsNullOrWhiteSpace(source.LatestTitleSelector)
+            && string.IsNullOrWhiteSpace(source.LatestLinkSelector)
+            && string.IsNullOrWhiteSpace(source.LatestPosterSelector))
+        {
+            return source;
+        }
+
+        var copy = source.Clone();
+        copy.RowSelector = FirstNonEmpty(source.LatestRowSelector, source.RowSelector);
+        copy.TitleSelector = FirstNonEmpty(source.LatestTitleSelector, source.TitleSelector);
+        copy.LinkSelector = FirstNonEmpty(source.LatestLinkSelector, source.LinkSelector);
+        copy.PosterSelector = FirstNonEmpty(source.LatestPosterSelector, source.PosterSelector);
+        return copy;
+    }
 
     private static IReadOnlyList<IElement> SelectRows(IHtmlDocument document, string? selector)
     {
@@ -151,6 +229,13 @@ public sealed class HtmlSourceScraper : SourceScraperBase, ISourceScraper
         {
             var linkSelector = source.LinkSelector.Split('@')[0].Trim();
             title = SelectorReader.Read(row, linkSelector.Length == 0 ? "@self" : linkSelector);
+        }
+
+        // Listas que solo muestran la carátula (sin texto): el título se deduce
+        // del slug del enlace, p. ej. /pelicula/31220/Un-buen-abogado.
+        if (string.IsNullOrWhiteSpace(title) && !string.IsNullOrWhiteSpace(detailUrl))
+        {
+            title = TextUtil.TitleFromUrl(detailUrl);
         }
 
         string? magnet = null;
