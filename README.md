@@ -1,5 +1,9 @@
 # Torrent Search para Jellyfin
 
+<p align="center">
+  <img src="logo.png" alt="Logo de Torrent Search" width="180">
+</p>
+
 Plugin para **Jellyfin 12.x (net10.0)** que hace de **proxy entre tus búsquedas
 y las webs de torrents que tú configures**, y envía los enlaces al cliente de
 descargas de tu equipo.

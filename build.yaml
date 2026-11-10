@@ -1,5 +1,7 @@
 name: "Torrent Search"
 guid: "5c1b8a63-7e42-4b0f-9d61-3a8f2c4e9b17"
+image: "logo.png"
+imageUrl: "https://raw.githubusercontent.com/nen155/Jellyfin.Plugin.Torrent/main/logo.png"
 version: "1.2.0.0"
 targetAbi: "12.1.0.0"
 framework: "net10.0"
