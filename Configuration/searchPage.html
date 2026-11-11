@@ -129,6 +129,32 @@
             #TorrentSearchPage .ts-toast.err { background: #a33; }
             #TorrentSearchPage .ts-toast.ok { background: #2a7a3a; }
 
+            /* --- progreso de las descargas --- */
+            #TorrentSearchPage .ts-downloads { margin: .75rem 0; display: flex; flex-direction: column; gap: .35rem; }
+            #TorrentSearchPage .ts-dl-head { font-size: .8rem; opacity: .7; }
+            #TorrentSearchPage .ts-dl-row {
+                display: flex; align-items: center; gap: .6rem;
+                background: rgba(127,127,127,.12); border: 1px solid rgba(127,127,127,.28);
+                border-radius: 8px; padding: .4rem .6rem;
+            }
+            #TorrentSearchPage .ts-dl-title {
+                flex: 1 1 28%; min-width: 7em; font-size: .82rem;
+                white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+            }
+            #TorrentSearchPage .ts-dl-bar {
+                flex: 2 1 40%; height: 6px; border-radius: 3px;
+                background: rgba(127,127,127,.3); overflow: hidden;
+            }
+            #TorrentSearchPage .ts-dl-fill {
+                display: block; height: 100%; width: 0; background: #00a4dc;
+                transition: width .3s linear;
+            }
+            #TorrentSearchPage .ts-dl-row.done .ts-dl-fill { background: #2a7a3a; }
+            #TorrentSearchPage .ts-dl-meta {
+                font-size: .75rem; opacity: .85; min-width: 10em; text-align: right; white-space: nowrap;
+            }
+            #TorrentSearchPage .ts-dl-close { min-width: auto; padding: 0 .45rem; }
+
             /* --- base autosuficiente: no depende de los componentes de jellyfin-web --- */
             #TorrentSearchPage * { box-sizing: border-box; }
             #TorrentSearchPage h1 { font-size: 1.5rem; font-weight: 600; margin: 0 0 .25rem; }
@@ -251,6 +277,8 @@
                 <div class="ts-status" id="tsStatus"></div>
                 <div class="ts-sources" id="tsOutcomes"></div>
 
+                <div class="ts-downloads" id="tsDownloads" style="display:none"></div>
+
                 <div class="ts-grid" id="tsGrid"></div>
                 <div class="ts-empty" id="tsEmpty">
                     Escribe un título y pulsa Buscar. Los resultados se ordenan por seeds por defecto.
@@ -329,7 +357,9 @@
                 suggestions: { movies: [], series: [] },
                 selectedSources: [],
                 languages: [],
-                busy: false
+                busy: false,
+                downloads: [],
+                dlTimer: null
             };
 
             var LANG_LABEL = {
@@ -358,7 +388,14 @@
                     opts.headers['Content-Type'] = 'application/json';
                     opts.body = JSON.stringify(opts.body);
                 }
-                return fetch(ApiClient.getUrl(path), opts).then(function (response) {
+
+                // La query se añade después de getUrl: así el token y la base
+                // de la URL los pone ApiClient.
+                var queryIndex = path.indexOf('?');
+                var basePath = queryIndex >= 0 ? path.slice(0, queryIndex) : path;
+                var query = queryIndex >= 0 ? path.slice(queryIndex) : '';
+
+                return fetch(ApiClient.getUrl(basePath) + query, opts).then(function (response) {
                     return response.text().then(function (text) {
                         var data = null;
                         try { data = text ? JSON.parse(text) : null; } catch (e) { data = null; }
@@ -421,6 +458,186 @@
                 toast.textContent = message;
                 page.appendChild(toast);
                 setTimeout(function () { toast.remove(); }, 4500);
+            }
+
+            // ---------- Progreso de las descargas ----------
+            var TS_DL_KEY = 'torrent.downloads.v1';
+
+            function tsDownloads() {
+                return TS.downloads;
+            }
+
+            function tsLoadDownloads() {
+                try {
+                    var raw = window.localStorage.getItem(TS_DL_KEY);
+                    TS.downloads = raw ? (JSON.parse(raw) || []) : [];
+                } catch (e) {
+                    TS.downloads = [];
+                }
+                if (!Array.isArray(TS.downloads)) { TS.downloads = []; }
+                tsRenderDownloads();
+                tsEnsurePolling();
+            }
+
+            function tsSaveDownloads() {
+                try {
+                    window.localStorage.setItem(TS_DL_KEY, JSON.stringify(TS.downloads));
+                } catch (e) {
+                    // Sin persistencia (modo privado): se mantiene en memoria.
+                }
+            }
+
+            function tsFindDownload(infoHash) {
+                var hash = String(infoHash || '').toLowerCase();
+                if (!hash) { return null; }
+                return tsDownloads().filter(function (d) { return d.hash === hash; })[0] || null;
+            }
+
+            function tsTrackDownload(result, title) {
+                var hash = String((result && result.infoHash) || '').toLowerCase();
+                if (!hash) { return; }
+
+                var existing = tsFindDownload(hash);
+                if (existing) {
+                    existing.title = title || existing.title;
+                    existing.complete = false;
+                } else {
+                    tsDownloads().push({
+                        hash: hash,
+                        title: title || hash,
+                        client: result.client || '',
+                        progress: 0,
+                        state: 'Enviado',
+                        speed: 0,
+                        eta: null,
+                        complete: false,
+                        addedAt: Date.now()
+                    });
+                }
+
+                tsSaveDownloads();
+                tsRenderDownloads();
+                tsEnsurePolling();
+                tsPollStatus();
+            }
+
+            function tsFormatEta(seconds) {
+                if (!seconds) { return ''; }
+                var minutes = Math.round(seconds / 60);
+                if (minutes < 1) { return 'menos de 1 min'; }
+                if (minutes < 60) { return minutes + ' min'; }
+                var hours = Math.floor(minutes / 60);
+                var rest = minutes % 60;
+                return rest ? (hours + ' h ' + rest + ' min') : (hours + ' h');
+            }
+
+            function tsRenderDownloads() {
+                var page = tsPage();
+                if (!page) { return; }
+                var box = page.querySelector('#tsDownloads');
+                if (!box) { return; }
+
+                var list = tsDownloads();
+                if (!list.length) {
+                    box.style.display = 'none';
+                    box.innerHTML = '';
+                    return;
+                }
+
+                box.style.display = '';
+                var rows = list.map(function (d, index) {
+                    var pct = Math.round((d.progress || 0) * 100);
+                    var meta = d.complete
+                        ? 'Completado'
+                        : ((d.state || '') +
+                            (d.speed ? ' · ' + tsFormatSize(d.speed) + '/s' : '') +
+                            (d.eta ? ' · ' + tsFormatEta(d.eta) : ''));
+                    return '<div class="ts-dl-row' + (d.complete ? ' done' : '') + '">'
+                        + '<span class="ts-dl-title" title="' + tsEscape(d.title) + '">'
+                        + tsEscape(d.title) + '</span>'
+                        + '<span class="ts-dl-bar"><span class="ts-dl-fill" style="width:' + pct + '%"></span></span>'
+                        + '<span class="ts-dl-meta">' + pct + '% · ' + tsEscape(meta) + '</span>'
+                        + '<button is="emby-button" type="button" class="ts-dl-close" data-dl="' + index
+                        + '" title="Quitar de la lista"><span>✕</span></button>'
+                        + '</div>';
+                }).join('');
+
+                box.innerHTML = '<div class="ts-dl-head"><span>Descargas en el cliente</span></div>' + rows;
+
+                [].forEach.call(box.querySelectorAll('.ts-dl-close'), function (btn) {
+                    btn.addEventListener('click', function () {
+                        var index = parseInt(btn.getAttribute('data-dl'), 10);
+                        if (isNaN(index)) { return; }
+                        tsDownloads().splice(index, 1);
+                        tsSaveDownloads();
+                        tsRenderDownloads();
+                        tsEnsurePolling();
+                    });
+                });
+            }
+
+            function tsEnsurePolling() {
+                var pending = tsDownloads().filter(function (d) { return !d.complete; });
+                if (!pending.length) {
+                    if (TS.dlTimer) {
+                        clearInterval(TS.dlTimer);
+                        TS.dlTimer = null;
+                    }
+                    return;
+                }
+
+                if (TS.dlTimer) { return; }
+                TS.dlTimer = setInterval(tsPollStatus, 3000);
+            }
+
+            function tsPollStatus() {
+                var pending = tsDownloads().filter(function (d) { return !d.complete; });
+                if (!pending.length) {
+                    tsEnsurePolling();
+                    return;
+                }
+
+                var hashes = pending.map(function (d) { return d.hash; }).join(',');
+                tsFetch('Torrent/api/status?hashes=' + encodeURIComponent(hashes)).then(function (response) {
+                    var byHash = {};
+                    ((response && response.statuses) || []).forEach(function (status) {
+                        byHash[String(status.infoHash || '').toLowerCase()] = status;
+                    });
+
+                    var finished = [];
+                    tsDownloads().forEach(function (d) {
+                        var status = byHash[d.hash];
+                        if (!status) {
+                            if (response && response.available === false) {
+                                d.state = 'Cliente no disponible';
+                                d.speed = 0;
+                            }
+                            return;
+                        }
+
+                        d.progress = status.progress || 0;
+                        d.state = status.state || '';
+                        d.speed = status.downloadSpeed || 0;
+                        d.eta = status.etaSeconds || null;
+                        if (status.name) { d.name = status.name; }
+                        if (status.isComplete) {
+                            d.complete = true;
+                            d.progress = 1;
+                            d.speed = 0;
+                            d.eta = null;
+                            finished.push(d.title);
+                        }
+                    });
+
+                    tsSaveDownloads();
+                    tsRenderDownloads();
+                    tsEnsurePolling();
+                    finished.forEach(function (title) {
+                        tsToast('Descarga completada: ' + title, 'ok');
+                    });
+                }).catch(function () {
+                    // El cliente puede estar cerrado: se reintenta en el siguiente ciclo.
+                });
             }
 
             function tsPoster(item) {
@@ -728,7 +945,7 @@
                         + '</div>'
                         + '<div class="ts-actions">'
                         + '<button is="emby-button" type="button" class="raised ts-download" data-index="' + index + '">'
-                        + '<span>' + (item.hasLink ? 'Descargar' : 'Sin enlace') + '</span></button>'
+                        + '<span>' + tsEscape(tsDownloadLabel(item)) + '</span></button>'
                         + '<button is="emby-button" type="button" class="raised ts-details" data-index="' + index + '">'
                         + '<span>Más info</span></button>'
                         + '</div>'
@@ -739,6 +956,12 @@
             function tsFindItem(index) {
                 var i = parseInt(index, 10);
                 return isNaN(i) ? null : TS.results[i];
+            }
+
+            function tsDownloadLabel(item) {
+                var tracked = tsFindDownload(item.infoHash);
+                if (tracked && !tracked.complete) { return 'Descargando…'; }
+                return item.hasLink ? 'Descargar' : 'Sin enlace';
             }
 
             function tsSendToClient(item) {
@@ -774,6 +997,9 @@
                     }
 
                     tsToast(result.message || 'Enviado.', result.success ? 'ok' : 'err');
+                    if (result.success && result.infoHash) {
+                        tsTrackDownload(result, item.releaseName || item.title);
+                    }
                 }).catch(function (err) {
                     tsToast('No se pudo enviar: ' + err.message, 'err');
                 });
@@ -1068,6 +1294,7 @@
                 }
 
                 tsLoadConfig();
+                tsLoadDownloads();
 
                 if (fromQuery && page.dataset.tsAuto !== '1') {
                     page.dataset.tsAuto = '1';

@@ -62,11 +62,15 @@ public sealed class DownloadResult
     /// <summary>Gets or sets la URL del .torrent.</summary>
     public string? TorrentUrl { get; set; }
 
-    /// <summary>
-    /// Gets or sets la ruta del archivo guardado cuando no había cliente
-    /// disponible (.torrent o .magnet).
-    /// </summary>
+    /// <summary>Gets or sets la ruta del archivo guardado cuando no había cliente
+    /// disponible (.torrent o .magnet).</summary>
     public string? SavedPath { get; set; }
+
+    /// <summary>
+    /// Gets or sets el info-hash del torrent enviado, para poder consultar su
+    /// progreso después.
+    /// </summary>
+    public string? InfoHash { get; set; }
 }
 
 /// <summary>
@@ -110,5 +114,17 @@ public interface IDownloadClient
     Task<DownloadResult> AddAsync(
         DownloadClientConfig config,
         DownloadRequest request,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Consulta el estado de un torrent por su info-hash.
+    /// </summary>
+    /// <param name="config">Configuración del cliente.</param>
+    /// <param name="infoHash">Info-hash en hexadecimal.</param>
+    /// <param name="cancellationToken">Token de cancelación.</param>
+    /// <returns>Estado del torrent, o null si el cliente no lo conoce.</returns>
+    Task<TorrentStatus?> GetStatusAsync(
+        DownloadClientConfig config,
+        string infoHash,
         CancellationToken cancellationToken);
 }

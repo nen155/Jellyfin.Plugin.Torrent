@@ -29,6 +29,10 @@ artifacts:
   - "Jellyfin.Plugin.Torrent.dll"
   - "AngleSharp.dll"
 changelog: |-
+  - 1.4.1: progreso de las descargas en la propia interfaz (barra, velocidad y
+    tiempo restante, consultando al cliente por info-hash; qBittorrent,
+    Transmission y Deluge), y arreglo del 401 al pedir carátulas y .torrent
+    desde <img>/enlaces (token en la URL, promocionado a cabecera).
   - 1.4.0: búsqueda mucho más rápida (las descargas protegidas con
     proof-of-work se resuelven por HTTP, sin navegador), carátulas buscadas en
     IMDb por el título cuando la fuente no las trae, apertura automática del

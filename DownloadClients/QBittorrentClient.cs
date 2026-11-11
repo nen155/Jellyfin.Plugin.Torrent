@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using Jellyfin.Plugin.Torrent.Models;
 using Microsoft.Extensions.Logging;
@@ -202,7 +203,105 @@ public sealed class QBittorrentClient : IDownloadClient, IDisposable
     }
 
     /// <inheritdoc />
+    public async Task<TorrentStatus?> GetStatusAsync(
+        DownloadClientConfig config,
+        string infoHash,
+        CancellationToken cancellationToken)
+    {
+        var baseUrl = config.BuildBaseUrl();
+        var login = await LoginAsync(baseUrl, config, cancellationToken).ConfigureAwait(false);
+        if (!login.Available)
+        {
+            return null;
+        }
+
+        using var request = CreateRequest(
+            HttpMethod.Get,
+            baseUrl,
+            "/api/v2/torrents/info?hashes=" + Uri.EscapeDataString(infoHash.ToLowerInvariant()),
+            baseUrl);
+
+        using var response = await _http.SendAsync(request, cancellationToken).ConfigureAwait(false);
+        if (!response.IsSuccessStatusCode)
+        {
+            return null;
+        }
+
+        var body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+        using var document = JsonDocument.Parse(body);
+        if (document.RootElement.ValueKind != JsonValueKind.Array)
+        {
+            return null;
+        }
+
+        foreach (var item in document.RootElement.EnumerateArray())
+        {
+            var state = GetString(item, "state") ?? string.Empty;
+            var progress = GetDouble(item, "progress");
+            var eta = GetLong(item, "eta");
+            var complete = progress >= 0.999 || IsCompleteState(state);
+            var size = GetLong(item, "size");
+
+            // "completed" son los bytes verificados (coincide con el progreso);
+            // "downloaded" no cuenta lo que ya estaba en disco al añadirlo.
+            var verified = GetLong(item, "completed");
+
+            return new TorrentStatus
+            {
+                Client = DisplayName,
+                InfoHash = GetString(item, "hash") ?? infoHash.ToLowerInvariant(),
+                Name = GetString(item, "name"),
+                Progress = Math.Clamp(progress, 0, 1),
+                State = TranslateState(state),
+                IsComplete = complete,
+                SizeBytes = size,
+                DownloadedBytes = verified > 0 ? verified : (long)(size * Math.Clamp(progress, 0, 1)),
+                DownloadSpeed = complete ? 0 : GetLong(item, "dlspeed"),
+                EtaSeconds = !complete && eta is > 0 and < 8640000 ? eta : null,
+                Seeds = (int)GetLong(item, "num_seeds"),
+                Leeches = (int)GetLong(item, "num_leechs")
+            };
+        }
+
+        return null;
+    }
+
+    /// <inheritdoc />
     public void Dispose() => _http.Dispose();
+
+    private static string TranslateState(string state) => state switch
+    {
+        "downloading" or "forcedDL" or "metaDL" => "Descargando",
+        "stalledDL" => "Sin fuentes",
+        "queuedDL" or "queuedForChecking" => "En cola",
+        "pausedDL" or "stoppedDL" => "En pausa",
+        "checkingDL" or "checkingUP" or "checkingResumeData" => "Comprobando",
+        "uploading" or "forcedUP" or "stalledUP" => "Completado",
+        "pausedUP" or "stoppedUP" => "Completado (en pausa)",
+        "queuedUP" => "Completado (en cola)",
+        "error" or "missingFiles" => "Error",
+        "moving" => "Moviendo",
+        _ => string.IsNullOrEmpty(state) ? "Desconocido" : state
+    };
+
+    private static bool IsCompleteState(string state) =>
+        state is "uploading" or "forcedUP" or "stalledUP" or "pausedUP" or "stoppedUP"
+            or "queuedUP" or "moving";
+
+    private static string? GetString(JsonElement item, string name)
+        => item.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String
+            ? value.GetString()
+            : null;
+
+    private static double GetDouble(JsonElement item, string name)
+        => item.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.Number
+            ? value.GetDouble()
+            : 0;
+
+    private static long GetLong(JsonElement item, string name)
+        => item.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.Number
+            ? value.GetInt64()
+            : 0;
 
     private async Task<ProbeResult> LoginAsync(
         string baseUrl,

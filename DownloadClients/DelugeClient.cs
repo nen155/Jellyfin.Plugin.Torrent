@@ -129,7 +129,83 @@ public sealed class DelugeClient : IDownloadClient, IDisposable
     }
 
     /// <inheritdoc />
+    public async Task<TorrentStatus?> GetStatusAsync(
+        DownloadClientConfig config,
+        string infoHash,
+        CancellationToken cancellationToken)
+    {
+        if (!await LoginAsync(config, cancellationToken).ConfigureAwait(false))
+        {
+            return null;
+        }
+
+        var keys = new[]
+        {
+            "name", "progress", "state", "download_payload_rate", "eta",
+            "total_size", "total_done", "num_seeds", "num_peers", "is_finished"
+        };
+
+        var (ok, body) = await CallAsync(
+                config,
+                "core.get_torrent_status",
+                new object[] { infoHash.ToLowerInvariant(), keys },
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        if (!ok)
+        {
+            return null;
+        }
+
+        using var document = JsonDocument.Parse(body);
+        if (!document.RootElement.TryGetProperty("result", out var result)
+            || result.ValueKind != JsonValueKind.Object)
+        {
+            return null;
+        }
+
+        // En Deluge el progreso va de 0 a 100.
+        var progress = GetDouble(result, "progress") / 100.0;
+        var state = result.TryGetProperty("state", out var s) ? s.GetString() ?? string.Empty : string.Empty;
+        var finished = result.TryGetProperty("is_finished", out var f) && f.ValueKind == JsonValueKind.True;
+        var complete = finished || progress >= 0.999 || state.Equals("Seeding", StringComparison.OrdinalIgnoreCase);
+        var eta = (long)GetDouble(result, "eta");
+
+        return new TorrentStatus
+        {
+            Client = DisplayName,
+            InfoHash = infoHash.ToLowerInvariant(),
+            Name = result.TryGetProperty("name", out var name) ? name.GetString() : null,
+            Progress = Math.Clamp(progress, 0, 1),
+            State = TranslateState(state),
+            IsComplete = complete,
+            SizeBytes = (long)GetDouble(result, "total_size"),
+            DownloadedBytes = (long)GetDouble(result, "total_done"),
+            DownloadSpeed = complete ? 0 : (long)GetDouble(result, "download_payload_rate"),
+            EtaSeconds = !complete && eta is > 0 and < 8640000 ? eta : null,
+            Seeds = (int)GetDouble(result, "num_seeds"),
+            Leeches = (int)GetDouble(result, "num_peers")
+        };
+    }
+
+    /// <inheritdoc />
     public void Dispose() => _http.Dispose();
+
+    private static string TranslateState(string state) => state switch
+    {
+        "Downloading" => "Descargando",
+        "Seeding" => "Completado",
+        "Paused" => "En pausa",
+        "Queued" => "En cola",
+        "Checking" or "Allocating" => "Comprobando",
+        "Error" => "Error",
+        _ => string.IsNullOrEmpty(state) ? "Desconocido" : state
+    };
+
+    private static double GetDouble(JsonElement item, string name)
+        => item.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.Number
+            ? value.GetDouble()
+            : 0;
 
     private async Task<bool> LoginAsync(DownloadClientConfig config, CancellationToken cancellationToken)
     {

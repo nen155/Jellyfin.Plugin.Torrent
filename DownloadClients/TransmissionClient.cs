@@ -95,7 +95,86 @@ public sealed class TransmissionClient : IDownloadClient, IDisposable
     }
 
     /// <inheritdoc />
+    public async Task<TorrentStatus?> GetStatusAsync(
+        DownloadClientConfig config,
+        string infoHash,
+        CancellationToken cancellationToken)
+    {
+        var payload = new
+        {
+            method = "torrent-get",
+            arguments = new
+            {
+                ids = new[] { infoHash.ToLowerInvariant() },
+                fields = new[]
+                {
+                    "hashString", "name", "percentDone", "status", "rateDownload",
+                    "eta", "totalSize", "leftUntilDone", "peersSendingToUs", "peersGettingFromUs"
+                }
+            }
+        };
+
+        var (success, body) = await CallAsync(config, payload, cancellationToken).ConfigureAwait(false);
+        if (!success)
+        {
+            return null;
+        }
+
+        using var document = JsonDocument.Parse(body);
+        if (!document.RootElement.TryGetProperty("arguments", out var arguments)
+            || !arguments.TryGetProperty("torrents", out var torrents)
+            || torrents.ValueKind != JsonValueKind.Array)
+        {
+            return null;
+        }
+
+        foreach (var item in torrents.EnumerateArray())
+        {
+            var status = (int)GetDouble(item, "status");
+            var progress = GetDouble(item, "percentDone");
+            var eta = (long)GetDouble(item, "eta");
+            var total = (long)GetDouble(item, "totalSize");
+            var left = (long)GetDouble(item, "leftUntilDone");
+            var complete = progress >= 0.999 || status is 5 or 6;
+
+            return new TorrentStatus
+            {
+                Client = DisplayName,
+                InfoHash = item.TryGetProperty("hashString", out var hash) ? hash.GetString() ?? infoHash : infoHash,
+                Name = item.TryGetProperty("name", out var name) ? name.GetString() : null,
+                Progress = Math.Clamp(progress, 0, 1),
+                State = TranslateState(status),
+                IsComplete = complete,
+                SizeBytes = total,
+                DownloadedBytes = Math.Max(0, total - left),
+                DownloadSpeed = complete ? 0 : (long)GetDouble(item, "rateDownload"),
+                EtaSeconds = !complete && eta is > 0 and < 8640000 ? eta : null,
+                Seeds = (int)GetDouble(item, "peersSendingToUs"),
+                Leeches = (int)GetDouble(item, "peersGettingFromUs")
+            };
+        }
+
+        return null;
+    }
+
+    /// <inheritdoc />
     public void Dispose() => _http.Dispose();
+
+    private static string TranslateState(int status) => status switch
+    {
+        0 => "En pausa",
+        1 or 2 => "Comprobando",
+        3 => "En cola",
+        4 => "Descargando",
+        5 => "Completado (en cola)",
+        6 => "Completado",
+        _ => "Desconocido"
+    };
+
+    private static double GetDouble(JsonElement item, string name)
+        => item.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.Number
+            ? value.GetDouble()
+            : 0;
 
     private async Task<(bool Success, string Body)> CallAsync(
         DownloadClientConfig config,

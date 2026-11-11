@@ -22,6 +22,7 @@ namespace Jellyfin.Plugin.Torrent.Api;
 /// <item><c>GET /Torrent/api/suggestions</c>: estrenos del día (películas y series).</item>
 /// <item><c>POST /Torrent/api/search</c>: búsqueda agregada.</item>
 /// <item><c>POST /Torrent/api/add</c>: envía un enlace al cliente de torrents.</item>
+/// <item><c>GET /Torrent/api/status</c>: progreso de las descargas enviadas.</item>
 /// <item><c>GET /Torrent/api/image|torrent|files</c>: proxy de carátulas y .torrent.</item>
 /// <item><c>POST /Torrent/api/source/test|domain/resolve</c>: diagnóstico (admin).</item>
 /// </list>
@@ -202,6 +203,10 @@ public class TorrentMiddleware
 
                 case "/api/add" when HttpMethods.IsPost(context.Request.Method):
                     await HandleAdd(context).ConfigureAwait(false);
+                    return;
+
+                case "/api/status" when HttpMethods.IsGet(context.Request.Method):
+                    await HandleStatus(context).ConfigureAwait(false);
                     return;
 
                 case "/api/image" when HttpMethods.IsGet(context.Request.Method):
@@ -407,6 +412,27 @@ public class TorrentMiddleware
             .ConfigureAwait(false);
 
         await WriteJson(context, result).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Progreso de las descargas enviadas al cliente: <c>?hashes=h1,h2</c>.
+    /// </summary>
+    private async Task HandleStatus(HttpContext context)
+    {
+        var raw = context.Request.Query["hashes"].ToString();
+        var hashes = raw
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(h => h.ToLowerInvariant())
+            .Where(h => h.Length is >= 32 and <= 64 && h.All(Uri.IsHexDigit))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Take(25)
+            .ToArray();
+
+        var response = await _clients
+            .GetStatusesAsync(hashes, context.RequestAborted)
+            .ConfigureAwait(false);
+
+        await WriteJson(context, response).ConfigureAwait(false);
     }
 
     private async Task HandleImage(HttpContext context)

@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Diagnostics;
 using Jellyfin.Plugin.Torrent.Models;
 using Jellyfin.Plugin.Torrent.Parsing;
+using Jellyfin.Plugin.Torrent.Scraping;
 using Jellyfin.Plugin.Torrent.Services;
 using Microsoft.Extensions.Logging;
 
@@ -82,10 +83,114 @@ public sealed class DownloadClientService
 
         if (result.Success)
         {
+            result.InfoHash ??= ResolveInfoHash(request);
             return result;
         }
 
         return await SaveToFolderAsync(request, config, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Calcula el info-hash del enlace enviado (magnet o .torrent) para poder
+    /// consultar luego su progreso en el cliente.
+    /// </summary>
+    private static string? ResolveInfoHash(DownloadRequest request)
+    {
+        var fromMagnet = MagnetExtractor.GetInfoHash(request.Magnet);
+        if (!string.IsNullOrWhiteSpace(fromMagnet))
+        {
+            return fromMagnet.ToLowerInvariant();
+        }
+
+        if (request.TorrentBytes is { Length: > 0 })
+        {
+            try
+            {
+                return TorrentParser.Parse(request.TorrentBytes).InfoHash.ToLowerInvariant();
+            }
+            catch (Exception)
+            {
+                return null;
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Consulta el progreso de varias descargas en el cliente configurado.
+    /// </summary>
+    /// <param name="hashes">Info-hashes a consultar.</param>
+    /// <param name="cancellationToken">Token de cancelación.</param>
+    /// <returns>Estado del cliente y de cada torrent conocido.</returns>
+    public async Task<DownloadStatusResponse> GetStatusesAsync(
+        IReadOnlyList<string> hashes,
+        CancellationToken cancellationToken)
+    {
+        var config = Plugin.Instance?.Configuration.DownloadClient ?? new DownloadClientConfig();
+        var response = new DownloadStatusResponse();
+
+        if (hashes.Count == 0)
+        {
+            response.Available = true;
+            return response;
+        }
+
+        var client = await ResolveStatusClientAsync(config, cancellationToken).ConfigureAwait(false);
+        if (client is null)
+        {
+            response.Message = "Ningún cliente de torrents responde.";
+            return response;
+        }
+
+        response.Available = true;
+        response.Client = client.DisplayName;
+
+        foreach (var hash in hashes.Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            try
+            {
+                var status = await client
+                    .GetStatusAsync(config, hash, cancellationToken)
+                    .ConfigureAwait(false);
+
+                if (status is not null)
+                {
+                    status.InfoHash = string.IsNullOrWhiteSpace(status.InfoHash) ? hash : status.InfoHash;
+                    response.Statuses.Add(status);
+                }
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "Torrent: no se pudo leer el estado de {Hash}", hash);
+            }
+        }
+
+        return response;
+    }
+
+    private async Task<IDownloadClient?> ResolveStatusClientAsync(
+        DownloadClientConfig config,
+        CancellationToken cancellationToken)
+    {
+        if (config.Kind != DownloadClientKind.Auto)
+        {
+            return _clients.FirstOrDefault(c => c.Kind == config.Kind);
+        }
+
+        foreach (var client in _clients)
+        {
+            if (await IsAvailableAsync(client, config, cancellationToken).ConfigureAwait(false))
+            {
+                return client;
+            }
+        }
+
+        return null;
     }
 
     private async Task<DownloadResult?> PrepareTorrentAsync(

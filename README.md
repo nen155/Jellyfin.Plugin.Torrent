@@ -34,6 +34,11 @@ retos anti-bot y pulsar los botones de descarga protegidos.
   modo automático que prueba los tres. Si la web protege la descarga, el plugin
   descarga el `.torrent` **con las cookies de la sesión del navegador** y lo
   sube al cliente como archivo.
+- **Progreso de la descarga**: al enviar un enlace, la página muestra una barra
+  con el porcentaje, la velocidad y el tiempo restante, consultando al cliente
+  por el info-hash del torrent (qBittorrent, Transmission y Deluge). La lista se
+  guarda en el navegador, así que sobrevive a recargar la página, y avisa cuando
+  termina.
 - **Resolución automática de dominio** (página HTTP o canal de Discord con bot).
 - **Fuentes Torznab** (Jackett, Prowlarr, trackers con API compatible).
 - **Análisis automático de una web**: pega su URL y el plugin detecta el
