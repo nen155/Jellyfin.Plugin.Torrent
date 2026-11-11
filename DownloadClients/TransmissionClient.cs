@@ -158,6 +158,108 @@ public sealed class TransmissionClient : IDownloadClient, IDisposable
     }
 
     /// <inheritdoc />
+    public async Task<List<ClientTorrent>> GetTorrentsAsync(
+        DownloadClientConfig config,
+        CancellationToken cancellationToken)
+    {
+        var torrents = new List<ClientTorrent>();
+        var (ok, json) = await CallRawAsync(
+                config,
+                new
+                {
+                    method = "torrent-get",
+                    arguments = new
+                    {
+                        fields = new[]
+                        {
+                            "id", "hashString", "name", "percentDone", "status", "totalSize",
+                            "downloadDir", "uploadRatio", "secondsSeeding", "doneDate"
+                        }
+                    }
+                },
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        if (!ok || string.IsNullOrWhiteSpace(json))
+        {
+            return torrents;
+        }
+
+        using var document = JsonDocument.Parse(json);
+        if (!document.RootElement.TryGetProperty("arguments", out var arguments)
+            || !arguments.TryGetProperty("torrents", out var items)
+            || items.ValueKind != JsonValueKind.Array)
+        {
+            return torrents;
+        }
+
+        foreach (var item in items.EnumerateArray())
+        {
+            var percent = item.TryGetProperty("percentDone", out var percentElement)
+                && percentElement.TryGetDouble(out var percentValue)
+                    ? percentValue
+                    : 0;
+            var status = item.TryGetProperty("status", out var statusElement)
+                && statusElement.TryGetInt32(out var statusValue)
+                    ? statusValue
+                    : 0;
+            var doneDate = item.TryGetProperty("doneDate", out var doneElement)
+                && doneElement.TryGetInt64(out var doneValue)
+                && doneValue > 0
+                    ? DateTimeOffset.FromUnixTimeSeconds(doneValue)
+                    : (DateTimeOffset?)null;
+
+            torrents.Add(new ClientTorrent
+            {
+                Hash = item.TryGetProperty("hashString", out var hashElement) ? hashElement.GetString() ?? string.Empty : string.Empty,
+                Name = item.TryGetProperty("name", out var nameElement) ? nameElement.GetString() ?? string.Empty : string.Empty,
+                State = status switch
+                {
+                    0 => "stopped",
+                    1 or 2 => "checking",
+                    3 or 4 => "downloading",
+                    5 => "queued",
+                    6 => "seeding",
+                    _ => "unknown"
+                },
+                Progress = percent,
+                Size = item.TryGetProperty("totalSize", out var sizeElement) && sizeElement.TryGetInt64(out var sizeValue) ? sizeValue : 0,
+                SavePath = item.TryGetProperty("downloadDir", out var dirElement) ? dirElement.GetString() : null,
+                Ratio = item.TryGetProperty("uploadRatio", out var ratioElement) && ratioElement.TryGetDouble(out var ratioValue) ? ratioValue : 0,
+                SeedingSeconds = item.TryGetProperty("secondsSeeding", out var seedingElement) && seedingElement.TryGetInt64(out var seedingValue) ? seedingValue : 0,
+                Completed = percent >= 0.999,
+                CompletedOn = doneDate
+            });
+        }
+
+        return torrents;
+    }
+
+    /// <inheritdoc />
+    public async Task<bool> RemoveAsync(
+        DownloadClientConfig config,
+        string hash,
+        bool deleteFiles,
+        CancellationToken cancellationToken)
+    {
+        var (ok, _) = await CallAsync(
+                config,
+                new
+                {
+                    method = "torrent-remove",
+                    arguments = new
+                    {
+                        ids = new[] { hash },
+                        delete_local_data = deleteFiles
+                    }
+                },
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        return ok;
+    }
+
+    /// <inheritdoc />
     public void Dispose() => _http.Dispose();
 
     private static string TranslateState(int status) => status switch
@@ -177,6 +279,31 @@ public sealed class TransmissionClient : IDownloadClient, IDisposable
             : 0;
 
     private async Task<(bool Success, string Body)> CallAsync(
+        DownloadClientConfig config,
+        object payload,
+        CancellationToken cancellationToken)
+    {
+        var (success, json) = await CallRawAsync(config, payload, cancellationToken).ConfigureAwait(false);
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            return (success, "sin respuesta");
+        }
+
+        try
+        {
+            using var document = JsonDocument.Parse(json);
+            var result = document.RootElement.TryGetProperty("result", out var resultElement)
+                ? resultElement.GetString()
+                : null;
+            return (success, result ?? json);
+        }
+        catch (JsonException)
+        {
+            return (success, json);
+        }
+    }
+
+    private async Task<(bool Success, string Json)> CallRawAsync(
         DownloadClientConfig config,
         object payload,
         CancellationToken cancellationToken)
@@ -231,7 +358,7 @@ public sealed class TransmissionClient : IDownloadClient, IDisposable
                 var result = document.RootElement.TryGetProperty("result", out var r)
                     ? r.GetString()
                     : null;
-                return (result == "success", result ?? body);
+                return (result == "success", body);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {

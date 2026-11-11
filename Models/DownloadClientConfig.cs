@@ -19,6 +19,8 @@ public class DownloadClientConfig
         Category = string.Empty;
         Tags = string.Empty;
         StartPaused = false;
+        RemoveCompleted = true;
+        RemoveCompletedAfterMinutes = 0;
         ExecutablePath = string.Empty;
         AutoStart = true;
         FallbackPath = string.Empty;
@@ -50,6 +52,19 @@ public class DownloadClientConfig
 
     /// <summary>Gets or sets a value indicating whether se añade en pausa.</summary>
     public bool StartPaused { get; set; }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether los torrents completados se
+    /// quitan del cliente (sin borrar los archivos) para que Jellyfin pueda
+    /// moverlos.
+    /// </summary>
+    public bool RemoveCompleted { get; set; }
+
+    /// <summary>
+    /// Gets or sets los minutos a esperar desde que el torrent se completa
+    /// antes de quitarlo del cliente.
+    /// </summary>
+    public int RemoveCompletedAfterMinutes { get; set; }
 
     /// <summary>
     /// Gets or sets la ruta del ejecutable del cliente. Vacío = se busca en las

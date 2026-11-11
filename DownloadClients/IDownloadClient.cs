@@ -117,6 +117,32 @@ public interface IDownloadClient
         CancellationToken cancellationToken);
 
     /// <summary>
+    /// Lista los torrents del cliente.
+    /// </summary>
+    /// <param name="config">Configuración del cliente.</param>
+    /// <param name="cancellationToken">Token de cancelación.</param>
+    /// <returns>Torrents o lista vacía.</returns>
+    Task<List<ClientTorrent>> GetTorrentsAsync(
+        DownloadClientConfig config,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Quita un torrent del cliente.
+    /// </summary>
+    /// <param name="config">Configuración del cliente.</param>
+    /// <param name="hash">Hash del torrent.</param>
+    /// <param name="deleteFiles">
+    /// True para borrar también los archivos; false los conserva en disco.
+    /// </param>
+    /// <param name="cancellationToken">Token de cancelación.</param>
+    /// <returns>True si se quitó.</returns>
+    Task<bool> RemoveAsync(
+        DownloadClientConfig config,
+        string hash,
+        bool deleteFiles,
+        CancellationToken cancellationToken);
+
+    /// <summary>
     /// Consulta el estado de un torrent por su info-hash.
     /// </summary>
     /// <param name="config">Configuración del cliente.</param>

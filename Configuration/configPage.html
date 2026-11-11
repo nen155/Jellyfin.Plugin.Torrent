@@ -386,6 +386,25 @@
 
                     <div class="checkboxContainer checkboxContainer-withDescription">
                         <label>
+                            <input is="emby-toggle" type="checkbox" id="tcClientRemoveCompleted" />
+                            <span>Quitar del cliente al completar (conservar archivos)</span>
+                        </label>
+                        <div class="fieldDescription checkboxFieldDescription">
+                            Al terminar la descarga se quita el torrent del cliente <b>sin borrar los
+                            archivos</b>, para que Jellyfin pueda moverlos, y se avisa a Media Organizer
+                            si está instalado. Solo afecta a los torrents de la categoría o carpeta
+                            configuradas arriba.
+                        </div>
+                    </div>
+
+                    <div class="tc-field" style="max-width:280px">
+                        <label for="tcClientRemoveAfter">Esperar antes de quitarlo (minutos)</label>
+                        <input type="number" id="tcClientRemoveAfter" min="0" max="1440" />
+                        <div class="tc-hint">0 = en cuanto termina.</div>
+                    </div>
+
+                    <div class="checkboxContainer checkboxContainer-withDescription">
+                        <label>
                             <input is="emby-toggle" type="checkbox" id="tcClientAutoStart" />
                             <span>Abrir el cliente si no está en marcha</span>
                         </label>
@@ -1054,6 +1073,8 @@
                 page.querySelector('#tcClientCategory').value = client.Category || '';
                 page.querySelector('#tcClientTags').value = client.Tags || '';
                 page.querySelector('#tcClientPaused').checked = !!client.StartPaused;
+                page.querySelector('#tcClientRemoveCompleted').checked = client.RemoveCompleted !== false;
+                page.querySelector('#tcClientRemoveAfter').value = client.RemoveCompletedAfterMinutes || 0;
                 page.querySelector('#tcClientExe').value = client.ExecutablePath || '';
                 page.querySelector('#tcClientAutoStart').checked = client.AutoStart !== false;
                 page.querySelector('#tcClientFallbackPath').value = client.FallbackPath || '';

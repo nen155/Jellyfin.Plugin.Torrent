@@ -25,6 +25,18 @@ public class AddTorrentRequest
 }
 
 /// <summary>
+/// Petición para quitar un torrent del cliente.
+/// </summary>
+public class RemoveTorrentRequest
+{
+    /// <summary>Gets or sets el hash del torrent.</summary>
+    public string Hash { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets a value indicating whether se borran los archivos.</summary>
+    public bool DeleteFiles { get; set; }
+}
+
+/// <summary>
 /// Petición para analizar una web y proponer su configuración.
 /// </summary>
 public class DiscoverRequest

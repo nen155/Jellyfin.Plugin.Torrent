@@ -37,6 +37,8 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator
         serviceCollection.AddSingleton<IDownloadClient, TransmissionClient>();
         serviceCollection.AddSingleton<IDownloadClient, DelugeClient>();
         serviceCollection.AddSingleton<DownloadClientService>();
+        serviceCollection.AddSingleton<MediaOrganizerBridge>();
+        serviceCollection.AddHostedService<CompletedTorrentCleaner>();
 
         serviceCollection.AddTransient<IStartupFilter, TorrentStartupFilter>();
     }

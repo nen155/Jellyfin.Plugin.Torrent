@@ -209,6 +209,9 @@
                         <button is="emby-button" type="button" id="tsConfigBtn" class="raised" style="display:none">
                             <span>Configuración</span>
                         </button>
+                        <button is="emby-button" type="button" id="tsDownloadsBtn" class="raised">
+                            <span>Liberar archivos</span>
+                        </button>
                         <button is="emby-button" type="button" id="tsManualBtn" class="raised">
                             <span>Enlace manual</span>
                         </button>
@@ -294,6 +297,22 @@
 
         <div class="ts-modal" id="tsDetailsModal">
             <div class="ts-modal-box" id="tsDetailsBox"></div>
+        </div>
+
+        <div class="ts-modal" id="tsDownloadsModal">
+            <div class="ts-modal-box">
+                <div class="ts-modal-head">
+                    <div class="ts-modal-title">Descargas del cliente · liberar archivos</div>
+                    <button is="emby-button" type="button" class="raised" data-close="tsDownloadsModal">
+                        <span>Cerrar</span>
+                    </button>
+                </div>
+                <div class="fieldDescription">
+                    «Liberar» quita el torrent del cliente <b>sin borrar el archivo</b> y avisa a
+                    Media Organizer para que lo mueva a la biblioteca.
+                </div>
+                <div id="tsDownloadsList" class="ts-files" style="max-height:55vh;margin-top:.5rem"></div>
+            </div>
         </div>
 
         <div class="ts-modal" id="tsManualModal">
@@ -1184,6 +1203,51 @@
                 }
             }
 
+            function tsLoadDownloads() {
+                var page = tsPage();
+                var list = page.querySelector('#tsDownloadsList');
+                list.innerHTML = '<div class="fieldDescription">Consultando el cliente…</div>';
+
+                tsFetch('Torrent/api/client/torrents', { method: 'GET' }).then(function (torrents) {
+                    if (!torrents || !torrents.length) {
+                        list.innerHTML = '<div class="fieldDescription">No hay descargas en el cliente.</div>';
+                        return;
+                    }
+
+                    list.innerHTML = torrents.map(function (torrent) {
+                        var percent = Math.round((torrent.progress || 0) * 1000) / 10;
+                        var state = torrent.completed ? 'completado' : percent + '%';
+                        return '<div style="display:flex;gap:.6rem;align-items:center;padding:.35rem 0;border-bottom:1px solid rgba(127,127,127,.2)">'
+                            + '<div style="flex:1;min-width:0">'
+                            + '<div style="font-size:.85rem">' + tsEscape(torrent.name) + '</div>'
+                            + '<div class="fieldDescription" style="margin:0">'
+                            + tsEscape(state) + ' · ' + tsEscape(tsFormatSize(torrent.size))
+                            + (torrent.category ? ' · ' + tsEscape(torrent.category) : '')
+                            + '</div></div>'
+                            + '<button is="emby-button" type="button" class="raised ts-release" data-hash="'
+                            + tsEscape(torrent.hash) + '"><span>Liberar</span></button>'
+                            + '</div>';
+                    }).join('');
+                }).catch(function (err) {
+                    list.innerHTML = '<div class="fieldDescription">Error: ' + tsEscape(err.message) + '</div>';
+                });
+            }
+
+            function tsReleaseTorrent(hash) {
+                tsToast('Quitando del cliente (se conserva el archivo)…');
+                tsFetch('Torrent/api/client/remove', {
+                    method: 'POST',
+                    body: { hash: hash, deleteFiles: false }
+                }).then(function (result) {
+                    tsToast(result.ok
+                        ? 'Torrent quitado. El archivo queda libre y Media Organizer puede moverlo.'
+                        : 'No se pudo quitar el torrent.', result.ok ? 'ok' : 'err');
+                    tsLoadDownloads();
+                }).catch(function (err) {
+                    tsToast('Error: ' + err.message, 'err');
+                });
+            }
+
             function tsManualSend() {
                 var page = tsPage();
                 var text = page.querySelector('#tsManualText').value;
@@ -1310,6 +1374,18 @@
 
                 page.querySelector('#tsManualBtn').addEventListener('click', function () {
                     page.querySelector('#tsManualModal').classList.add('open');
+                });
+
+                page.querySelector('#tsDownloadsBtn').addEventListener('click', function () {
+                    page.querySelector('#tsDownloadsModal').classList.add('open');
+                    tsLoadDownloads();
+                });
+
+                page.querySelector('#tsDownloadsList').addEventListener('click', function (event) {
+                    var button = event.target.closest('.ts-release');
+                    if (button) {
+                        tsReleaseTorrent(button.getAttribute('data-hash'));
+                    }
                 });
 
                 page.querySelector('#tsManualSend').addEventListener('click', tsManualSend);

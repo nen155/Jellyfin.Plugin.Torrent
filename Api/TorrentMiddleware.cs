@@ -251,6 +251,17 @@ public class TorrentMiddleware
                     await HandleDiscover(context).ConfigureAwait(false);
                     return;
 
+                case "/api/client/torrents" when HttpMethods.IsGet(context.Request.Method):
+                    await WriteJson(
+                        context,
+                        await _clients.GetTorrentsAsync(context.RequestAborted).ConfigureAwait(false))
+                        .ConfigureAwait(false);
+                    return;
+
+                case "/api/client/remove" when HttpMethods.IsPost(context.Request.Method):
+                    await HandleRemoveTorrent(context).ConfigureAwait(false);
+                    return;
+
                 case "/api/browser/probe" when HttpMethods.IsGet(context.Request.Method):
                     if (!isAdmin)
                     {
@@ -556,6 +567,31 @@ public class TorrentMiddleware
             .TestSourceAsync(request.SourceId, query, request.FetchDetails, context.RequestAborted)
             .ConfigureAwait(false);
         await WriteJson(context, response).ConfigureAwait(false);
+    }
+
+    private async Task HandleRemoveTorrent(HttpContext context)
+    {
+        var request = await ReadBodyAsync<RemoveTorrentRequest>(context).ConfigureAwait(false);
+        if (request is null || string.IsNullOrWhiteSpace(request.Hash))
+        {
+            context.Response.StatusCode = StatusCodes.Status400BadRequest;
+            await WriteJson(context, new { error = "Falta el hash del torrent." }).ConfigureAwait(false);
+            return;
+        }
+
+        var removed = await _clients
+            .RemoveAsync(request.Hash, request.DeleteFiles, context.RequestAborted)
+            .ConfigureAwait(false);
+
+        if (removed)
+        {
+            _logger.LogInformation(
+                "Torrent: torrent {Hash} quitado del cliente (borrar archivos: {Delete}).",
+                request.Hash,
+                request.DeleteFiles);
+        }
+
+        await WriteJson(context, new { ok = removed }).ConfigureAwait(false);
     }
 
     private async Task HandleDiscover(HttpContext context)

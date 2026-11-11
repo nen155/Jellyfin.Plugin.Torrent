@@ -543,6 +543,65 @@ public sealed class DownloadClientService
         return probes;
     }
 
+    /// <summary>
+    /// Lista los torrents del cliente configurado (o del que responda en modo
+    /// automático).
+    /// </summary>
+    /// <param name="cancellationToken">Token de cancelación.</param>
+    /// <returns>Torrents del cliente.</returns>
+    public async Task<List<ClientTorrent>> GetTorrentsAsync(CancellationToken cancellationToken)
+    {
+        var config = Plugin.Instance?.Configuration.DownloadClient ?? new DownloadClientConfig();
+        var client = await ResolveClientAsync(config, cancellationToken).ConfigureAwait(false);
+        return client is null
+            ? new List<ClientTorrent>()
+            : await client.GetTorrentsAsync(config, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Quita un torrent del cliente.
+    /// </summary>
+    /// <param name="hash">Hash del torrent.</param>
+    /// <param name="deleteFiles">True para borrar también los archivos.</param>
+    /// <param name="cancellationToken">Token de cancelación.</param>
+    /// <returns>True si se quitó.</returns>
+    public async Task<bool> RemoveAsync(
+        string hash,
+        bool deleteFiles,
+        CancellationToken cancellationToken)
+    {
+        var config = Plugin.Instance?.Configuration.DownloadClient ?? new DownloadClientConfig();
+        var client = await ResolveClientAsync(config, cancellationToken).ConfigureAwait(false);
+        return client is not null
+            && await client.RemoveAsync(config, hash, deleteFiles, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Determina qué cliente usar con la configuración actual.
+    /// </summary>
+    /// <param name="config">Configuración.</param>
+    /// <param name="cancellationToken">Token de cancelación.</param>
+    /// <returns>Cliente o null.</returns>
+    public async Task<IDownloadClient?> ResolveClientAsync(
+        DownloadClientConfig config,
+        CancellationToken cancellationToken)
+    {
+        if (config.Kind != DownloadClientKind.Auto)
+        {
+            return _clients.FirstOrDefault(c => c.Kind == config.Kind);
+        }
+
+        foreach (var client in _clients)
+        {
+            if (await IsAvailableAsync(client, config, cancellationToken).ConfigureAwait(false))
+            {
+                return client;
+            }
+        }
+
+        return null;
+    }
+
     private async Task<bool> IsAvailableAsync(
         IDownloadClient client,
         DownloadClientConfig config,

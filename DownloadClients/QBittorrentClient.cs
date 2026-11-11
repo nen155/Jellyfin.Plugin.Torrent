@@ -267,6 +267,101 @@ public sealed class QBittorrentClient : IDownloadClient, IDisposable
     }
 
     /// <inheritdoc />
+    public async Task<List<ClientTorrent>> GetTorrentsAsync(
+        DownloadClientConfig config,
+        CancellationToken cancellationToken)
+    {
+        var torrents = new List<ClientTorrent>();
+        var baseUrl = config.BuildBaseUrl();
+
+        var login = await LoginAsync(baseUrl, config, cancellationToken).ConfigureAwait(false);
+        if (!login.Available)
+        {
+            return torrents;
+        }
+
+        using var request = CreateRequest(HttpMethod.Get, baseUrl, "/api/v2/torrents/info", baseUrl);
+        using var response = await _http.SendAsync(request, cancellationToken).ConfigureAwait(false);
+        if (!response.IsSuccessStatusCode)
+        {
+            return torrents;
+        }
+
+        var json = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+        using var document = JsonDocument.Parse(json);
+        if (document.RootElement.ValueKind != JsonValueKind.Array)
+        {
+            return torrents;
+        }
+
+        foreach (var item in document.RootElement.EnumerateArray())
+        {
+            var state = item.TryGetProperty("state", out var stateElement)
+                ? stateElement.GetString() ?? string.Empty
+                : string.Empty;
+            var progress = item.TryGetProperty("progress", out var progressElement)
+                && progressElement.TryGetDouble(out var progressValue)
+                    ? progressValue
+                    : 0;
+
+            var completed = progress >= 0.999
+                || state.EndsWith("UP", StringComparison.OrdinalIgnoreCase);
+
+            var completionOn = item.TryGetProperty("completion_on", out var completionElement)
+                && completionElement.TryGetInt64(out var completionValue)
+                && completionValue > 0
+                    ? DateTimeOffset.FromUnixTimeSeconds(completionValue)
+                    : (DateTimeOffset?)null;
+
+            torrents.Add(new ClientTorrent
+            {
+                Hash = item.TryGetProperty("hash", out var hashElement) ? hashElement.GetString() ?? string.Empty : string.Empty,
+                Name = item.TryGetProperty("name", out var nameElement) ? nameElement.GetString() ?? string.Empty : string.Empty,
+                State = state,
+                Progress = progress,
+                Size = item.TryGetProperty("size", out var sizeElement) && sizeElement.TryGetInt64(out var sizeValue) ? sizeValue : 0,
+                SavePath = item.TryGetProperty("save_path", out var saveElement) ? saveElement.GetString() : null,
+                ContentPath = item.TryGetProperty("content_path", out var contentElement) ? contentElement.GetString() : null,
+                Category = item.TryGetProperty("category", out var categoryElement) ? categoryElement.GetString() : null,
+                Ratio = item.TryGetProperty("ratio", out var ratioElement) && ratioElement.TryGetDouble(out var ratioValue) ? ratioValue : 0,
+                SeedingSeconds = item.TryGetProperty("seeding_time", out var seedingElement) && seedingElement.TryGetInt64(out var seedingValue) ? seedingValue : 0,
+                Completed = completed,
+                CompletedOn = completionOn
+            });
+        }
+
+        return torrents;
+    }
+
+    /// <inheritdoc />
+    public async Task<bool> RemoveAsync(
+        DownloadClientConfig config,
+        string hash,
+        bool deleteFiles,
+        CancellationToken cancellationToken)
+    {
+        var baseUrl = config.BuildBaseUrl();
+
+        var login = await LoginAsync(baseUrl, config, cancellationToken).ConfigureAwait(false);
+        if (!login.Available)
+        {
+            return false;
+        }
+
+        using var content = new FormUrlEncodedContent(new[]
+        {
+            new KeyValuePair<string, string>("hashes", hash),
+            new KeyValuePair<string, string>("deleteFiles", deleteFiles ? "true" : "false")
+        });
+
+        using var request = CreateRequest(HttpMethod.Post, baseUrl, "/api/v2/torrents/delete", baseUrl);
+        request.Content = content;
+
+        using var response = await _http.SendAsync(request, cancellationToken).ConfigureAwait(false);
+        return response.IsSuccessStatusCode;
+    }
+
+    /// <inheritdoc />
     public void Dispose() => _http.Dispose();
 
     private static string TranslateState(string state) => state switch

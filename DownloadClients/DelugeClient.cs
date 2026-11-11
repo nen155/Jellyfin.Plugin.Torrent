@@ -189,6 +189,100 @@ public sealed class DelugeClient : IDownloadClient, IDisposable
     }
 
     /// <inheritdoc />
+    public async Task<List<ClientTorrent>> GetTorrentsAsync(
+        DownloadClientConfig config,
+        CancellationToken cancellationToken)
+    {
+        var torrents = new List<ClientTorrent>();
+        if (!await LoginAsync(config, cancellationToken).ConfigureAwait(false))
+        {
+            return torrents;
+        }
+
+        var (ok, body) = await CallAsync(
+                config,
+                "core.get_torrents_status",
+                new object[]
+                {
+                    new Dictionary<string, object>(),
+                    new[]
+                    {
+                        "hash", "name", "progress", "state", "save_path", "ratio",
+                        "seeding_time", "completed_time", "total_size"
+                    }
+                },
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        if (!ok || string.IsNullOrWhiteSpace(body))
+        {
+            return torrents;
+        }
+
+        using var document = JsonDocument.Parse(body);
+        if (!document.RootElement.TryGetProperty("result", out var result)
+            || result.ValueKind != JsonValueKind.Object)
+        {
+            return torrents;
+        }
+
+        foreach (var entry in result.EnumerateObject())
+        {
+            var item = entry.Value;
+            var progress = item.TryGetProperty("progress", out var progressElement)
+                && progressElement.TryGetDouble(out var progressValue)
+                    ? progressValue / 100d
+                    : 0;
+            var state = item.TryGetProperty("state", out var stateElement)
+                ? stateElement.GetString() ?? string.Empty
+                : string.Empty;
+            var completedTime = item.TryGetProperty("completed_time", out var timeElement)
+                && timeElement.TryGetDouble(out var timeValue)
+                && timeValue > 0
+                    ? DateTimeOffset.FromUnixTimeSeconds((long)timeValue)
+                    : (DateTimeOffset?)null;
+
+            torrents.Add(new ClientTorrent
+            {
+                Hash = entry.Name,
+                Name = item.TryGetProperty("name", out var nameElement) ? nameElement.GetString() ?? string.Empty : string.Empty,
+                State = state,
+                Progress = progress,
+                Size = item.TryGetProperty("total_size", out var sizeElement) && sizeElement.TryGetInt64(out var sizeValue) ? sizeValue : 0,
+                SavePath = item.TryGetProperty("save_path", out var saveElement) ? saveElement.GetString() : null,
+                Ratio = item.TryGetProperty("ratio", out var ratioElement) && ratioElement.TryGetDouble(out var ratioValue) ? ratioValue : 0,
+                SeedingSeconds = item.TryGetProperty("seeding_time", out var seedingElement) && seedingElement.TryGetInt64(out var seedingValue) ? seedingValue : 0,
+                Completed = progress >= 0.999 || state.Equals("Seeding", StringComparison.OrdinalIgnoreCase),
+                CompletedOn = completedTime
+            });
+        }
+
+        return torrents;
+    }
+
+    /// <inheritdoc />
+    public async Task<bool> RemoveAsync(
+        DownloadClientConfig config,
+        string hash,
+        bool deleteFiles,
+        CancellationToken cancellationToken)
+    {
+        if (!await LoginAsync(config, cancellationToken).ConfigureAwait(false))
+        {
+            return false;
+        }
+
+        var (ok, _) = await CallAsync(
+                config,
+                "core.remove_torrent",
+                new object[] { hash, deleteFiles },
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        return ok;
+    }
+
+    /// <inheritdoc />
     public void Dispose() => _http.Dispose();
 
     private static string TranslateState(string state) => state switch
