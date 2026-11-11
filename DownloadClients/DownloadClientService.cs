@@ -211,25 +211,35 @@ public sealed class DownloadClientService
     {
         if (request.TorrentBytes is not null
             || !string.IsNullOrWhiteSpace(request.Magnet)
-            || string.IsNullOrWhiteSpace(request.TorrentUrl)
-            || string.IsNullOrWhiteSpace(request.Cookie))
+            || string.IsNullOrWhiteSpace(request.TorrentUrl))
         {
             return null;
         }
 
+        // Se descarga aquí siempre que haya URL: así se envía como archivo y se
+        // conoce su info-hash (sin él no se puede consultar el progreso). Si
+        // falla, se deja la URL y el cliente se encarga de descargarlo.
         request.TorrentBytes = await _torrentFiles
             .GetBytesAsync(request.TorrentUrl, request.Referer, request.Cookie, cancellationToken)
             .ConfigureAwait(false);
 
         if (request.TorrentBytes is null)
         {
-            return new DownloadResult
+            if (!string.IsNullOrWhiteSpace(request.Cookie))
             {
-                Client = "Navegador",
-                Message = "No se pudo descargar el .torrent con la sesión de la web.",
-                Magnet = request.Magnet,
-                TorrentUrl = request.TorrentUrl
-            };
+                return new DownloadResult
+                {
+                    Client = "Navegador",
+                    Message = "No se pudo descargar el .torrent con la sesión de la web.",
+                    Magnet = request.Magnet,
+                    TorrentUrl = request.TorrentUrl
+                };
+            }
+
+            _logger.LogDebug(
+                "Torrent: no se pudo descargar el .torrent {Url}; se envía la URL al cliente",
+                request.TorrentUrl);
+            return null;
         }
 
         request.FileName = BuildFileName(request.Title);
