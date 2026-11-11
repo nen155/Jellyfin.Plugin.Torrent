@@ -282,6 +282,10 @@ public class TorrentMiddleware
                         .ConfigureAwait(false)).ConfigureAwait(false);
                     return;
 
+                case "/api/client/start" when HttpMethods.IsPost(context.Request.Method):
+                    await HandleClientStart(context).ConfigureAwait(false);
+                    return;
+
                 default:
                     context.Response.StatusCode = StatusCodes.Status404NotFound;
                     return;
@@ -412,6 +416,26 @@ public class TorrentMiddleware
             .ConfigureAwait(false);
 
         await WriteJson(context, result).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Abre el cliente de torrents configurado (botón «Abrir cliente»).
+    /// </summary>
+    private async Task HandleClientStart(HttpContext context)
+    {
+        var executable = _clients.StartClient();
+        var name = string.IsNullOrWhiteSpace(executable)
+            ? string.Empty
+            : Path.GetFileNameWithoutExtension(executable);
+
+        await WriteJson(context, new
+        {
+            started = !string.IsNullOrWhiteSpace(executable),
+            path = executable,
+            message = string.IsNullOrWhiteSpace(executable)
+                ? "No se encontró el ejecutable del cliente. Indícalo en «Ejecutable del cliente»."
+                : "Abriendo " + name + "…"
+        }).ConfigureAwait(false);
     }
 
     /// <summary>

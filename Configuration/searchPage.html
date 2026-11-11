@@ -131,7 +131,8 @@
 
             /* --- progreso de las descargas --- */
             #TorrentSearchPage .ts-downloads { margin: .75rem 0; display: flex; flex-direction: column; gap: .35rem; }
-            #TorrentSearchPage .ts-dl-head { font-size: .8rem; opacity: .7; }
+            #TorrentSearchPage .ts-dl-head { font-size: .8rem; opacity: .7; display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
+            #TorrentSearchPage .ts-dl-head button { font-size: .75rem; padding: .2rem .5rem; }
             #TorrentSearchPage .ts-dl-row {
                 display: flex; align-items: center; gap: .6rem;
                 background: rgba(127,127,127,.12); border: 1px solid rgba(127,127,127,.28);
@@ -562,7 +563,14 @@
                         + '</div>';
                 }).join('');
 
-                box.innerHTML = '<div class="ts-dl-head"><span>Descargas en el cliente</span></div>' + rows;
+                box.innerHTML = '<div class="ts-dl-head"><span>Descargas en el cliente</span>'
+                    + '<button is="emby-button" type="button" class="ts-dl-start" title="Abrir el cliente de torrents">'
+                    + '<span>Abrir cliente</span></button></div>' + rows;
+
+                var startBtn = box.querySelector('.ts-dl-start');
+                if (startBtn) {
+                    startBtn.addEventListener('click', tsStartClient);
+                }
 
                 [].forEach.call(box.querySelectorAll('.ts-dl-close'), function (btn) {
                     btn.addEventListener('click', function () {
@@ -576,8 +584,17 @@
                 });
             }
 
-            function tsEnsurePolling() {
-                var pending = tsDownloads().filter(function (d) { return !d.complete; });
+            function tsStartClient() {
+                tsToast('Abriendo el cliente de torrents…');
+                tsFetch('Torrent/api/client/start', { method: 'POST' }).then(function (response) {
+                    tsToast(response && response.message ? response.message : 'Cliente lanzado.', 'ok');
+                    setTimeout(tsPollStatus, 6000);
+                }).catch(function (err) {
+                    tsToast('No se pudo abrir el cliente: ' + err.message, 'err');
+                });
+            }
+
+            function tsEnsurePolling() {                var pending = tsDownloads().filter(function (d) { return !d.complete; });
                 if (!pending.length) {
                     if (TS.dlTimer) {
                         clearInterval(TS.dlTimer);

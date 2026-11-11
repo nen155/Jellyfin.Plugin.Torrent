@@ -19,10 +19,14 @@ public sealed class DownloadClientService
     private static readonly TimeSpan ProbeTtl = TimeSpan.FromMinutes(2);
     private static readonly TimeSpan ClientStartWait = TimeSpan.FromSeconds(6);
 
+    // Evita lanzar el cliente en cada sondeo de progreso.
+    private static readonly TimeSpan ClientStartThrottle = TimeSpan.FromMinutes(2);
+
     private readonly IReadOnlyList<IDownloadClient> _clients;
     private readonly TorrentFileService _torrentFiles;
     private readonly ILogger<DownloadClientService> _logger;
     private readonly ConcurrentDictionary<string, DateTimeOffset> _available = new();
+    private DateTimeOffset _lastStartAttempt = DateTimeOffset.MinValue;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="DownloadClientService"/> class.
@@ -75,7 +79,7 @@ public sealed class DownloadClientService
 
         var result = await TrySendAsync(config, request, cancellationToken).ConfigureAwait(false);
 
-        if (!result.Success && config.AutoStart && TryStartClient(config))
+        if (!result.Success && config.AutoStart && TryStartClient(config) is not null)
         {
             await Task.Delay(ClientStartWait, cancellationToken).ConfigureAwait(false);
             result = await TrySendAsync(config, request, cancellationToken).ConfigureAwait(false);
@@ -140,6 +144,14 @@ public sealed class DownloadClientService
         if (client is null)
         {
             response.Message = "Ningún cliente de torrents responde.";
+
+            // Si está configurado, se intenta abrir (con límite de frecuencia
+            // para no lanzar el proceso en cada sondeo).
+            if (config.AutoStart && TryStartClientThrottled(config) is not null)
+            {
+                response.Message = "Abriendo el cliente de torrents…";
+            }
+
             return response;
         }
 
@@ -280,28 +292,56 @@ public sealed class DownloadClientService
     }
 
     /// <summary>
+    /// Abre el cliente de torrents a petición del usuario (botón «Abrir cliente»).
+    /// </summary>
+    /// <returns>Ruta del ejecutable lanzado, o null si no se encontró.</returns>
+    public string? StartClient()
+    {
+        var config = Plugin.Instance?.Configuration.DownloadClient ?? new DownloadClientConfig();
+        _lastStartAttempt = DateTimeOffset.UtcNow;
+        return TryStartClient(config);
+    }
+
+    /// <summary>
+    /// Intenta abrir el cliente respetando un intervalo mínimo, para que los
+    /// sondeos de progreso no lancen el proceso una y otra vez.
+    /// </summary>
+    private string? TryStartClientThrottled(DownloadClientConfig config)
+    {
+        var now = DateTimeOffset.UtcNow;
+        if (now - _lastStartAttempt < ClientStartThrottle)
+        {
+            return null;
+        }
+
+        _lastStartAttempt = now;
+        return TryStartClient(config);
+    }
+
+    /// <summary>
     /// Intenta abrir el cliente de torrents cuando está cerrado.
     /// </summary>
-    private bool TryStartClient(DownloadClientConfig config)
+    /// <returns>Ruta del ejecutable, o null si no se pudo abrir.</returns>
+    private string? TryStartClient(DownloadClientConfig config)
     {
         var executable = ResolveClientExecutable(config);
         if (executable is null)
         {
             _logger.LogInformation(
                 "Torrent: no se encontró el ejecutable del cliente de torrents para abrirlo.");
-            return false;
+            return null;
         }
 
         try
         {
             Process.Start(new ProcessStartInfo(executable) { UseShellExecute = true });
             _logger.LogInformation("Torrent: abriendo el cliente de torrents {Path}", executable);
-            return true;
+            return executable;
         }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Torrent: no se pudo abrir el cliente de torrents {Path}", executable);
-            return false;
+            return null;
         }
     }
 
