@@ -2,7 +2,7 @@ name: "Torrent Search"
 guid: "5c1b8a63-7e42-4b0f-9d61-3a8f2c4e9b17"
 image: "logo.png"
 imageUrl: "https://raw.githubusercontent.com/nen155/Jellyfin.Plugin.Torrent/main/logo.png"
-version: "1.4.1.0"
+version: "1.4.2.0"
 targetAbi: "12.1.0.0"
 framework: "net10.0"
 owner: "NeN"
@@ -29,6 +29,9 @@ artifacts:
   - "Jellyfin.Plugin.Torrent.dll"
   - "AngleSharp.dll"
 changelog: |-
+  - 1.4.2: botón «Volver» en las páginas del plugin, scroll propio para la
+    app de cliente, render por tramos con content-visibility y sondeo de
+    descargas sin repintar cuando nada cambia.
   - 1.4.1: progreso de las descargas en la propia interfaz (barra, velocidad y
     tiempo restante, consultando al cliente por info-hash; qBittorrent,
     Transmission y Deluge), botón «Abrir cliente» y apertura automática si está
