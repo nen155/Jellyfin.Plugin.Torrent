@@ -83,6 +83,10 @@
 
         <div data-role="content">
             <div class="content-primary">
+                <button is="emby-button" type="button" id="tcBack" class="raised" style="margin-bottom:.5rem"
+                    title="Volver a la pantalla anterior">
+                    <span>← Volver</span>
+                </button>
                 <h1 style="margin-bottom:.25rem">Torrent Search</h1>
                 <div class="fieldDescription">
                     Meta-buscador: consulta las webs que configures, extrae sus enlaces y los envía al cliente
@@ -673,6 +677,23 @@
             }
 
             function tcPage() { return document.querySelector('#TorrentConfigPage'); }
+
+            function tcGoBack() {
+                try {
+                    if (window.history.length > 1) {
+                        window.history.back();
+                        return;
+                    }
+                } catch (e) {
+                    // Sin historial disponible.
+                }
+
+                if (typeof Dashboard !== 'undefined' && Dashboard.navigate) {
+                    Dashboard.navigate('home.html');
+                } else {
+                    window.location.hash = '#/home.html';
+                }
+            }
 
             function tcFetch(path, options) {
                 var token = ApiClient.accessToken ? ApiClient.accessToken() : '';
@@ -1266,6 +1287,11 @@
                     TC.config.Sources[index].Enabled = event.target.checked;
                     row.classList.toggle('off', !event.target.checked);
                 });
+
+                var tcBackBtn = page.querySelector('#tcBack');
+                if (tcBackBtn) {
+                    tcBackBtn.addEventListener('click', tcGoBack);
+                }
 
                 page.querySelector('#tcOpenSearch').addEventListener('click', function () {
                     if (typeof Dashboard !== 'undefined' && Dashboard.navigate) {

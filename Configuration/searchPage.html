@@ -193,6 +193,21 @@
             #TorrentSearchPage .fieldDescription { font-size: .8rem; opacity: .7; margin-top: .2rem; }
             #TorrentSearchPage a { color: #00a4dc; }
 
+            /* Scroll propio: si el contenedor del cliente no scrollea, la página
+               lo hace por sí misma (max-height:100% no aplica si el padre no
+               tiene altura definida, así que en el panel web no cambia nada). */
+            #TorrentSearchPage {
+                max-height: 100%; overflow-y: auto; overflow-x: hidden;
+                -webkit-overflow-scrolling: touch; overscroll-behavior: contain;
+            }
+            #TorrentSearchPage .ts-card {
+                content-visibility: auto;
+                contain-intrinsic-size: 160px;
+            }
+            #TorrentSearchPage .ts-grid { contain: layout style; }
+            #TorrentSearchPage .ts-modal-box { overscroll-behavior: contain; }
+            #TorrentSearchPage .ts-more { display: flex; justify-content: center; margin: 1rem 0 2rem; }
+            #TorrentSearchPage .ts-back { margin-bottom: .5rem; }
             @media (max-width: 600px) {
                 #TorrentSearchPage .ts-grid { grid-template-columns: 1fr; }
             }
@@ -202,6 +217,10 @@
             <div class="content-primary">
                 <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:1rem;flex-wrap:wrap">
                     <div>
+                        <button is="emby-button" type="button" id="tsBack" class="raised ts-back"
+                            title="Volver a la pantalla anterior">
+                            <span>← Volver</span>
+                        </button>
                         <h1 style="margin:0">Buscar torrents</h1>
                         <div class="fieldDescription" id="tsClientInfo">Cargando configuración…</div>
                     </div>
@@ -289,6 +308,7 @@
                 <div class="ts-downloads" id="tsDownloads" style="display:none"></div>
 
                 <div class="ts-grid" id="tsGrid"></div>
+                <div class="ts-more" id="tsMore" style="display:none"></div>
                 <div class="ts-empty" id="tsEmpty">
                     Escribe un título y pulsa Buscar. Los resultados se ordenan por seeds por defecto.
                 </div>
@@ -377,6 +397,7 @@
             })();
 
             var TS = {
+                renderLimit: 60,
                 config: null,
                 results: [],
                 suggestions: { movies: [], series: [] },
@@ -665,6 +686,10 @@
             }
 
             function tsPollStatus() {
+                if (document.hidden) {
+                    return;
+                }
+
                 var pending = tsDownloads().filter(function (d) { return !d.complete; });
                 if (!pending.length) {
                     tsEnsurePolling();
@@ -703,8 +728,17 @@
                         }
                     });
 
+                    var signature = tsDownloads().map(function (d) {
+                        return d.hash + ':' + Math.round((d.progress || 0) * 100)
+                            + ':' + (d.complete ? 1 : 0) + ':' + (d.state || '');
+                    }).join('|');
+
                     tsSaveDownloads();
-                    tsRenderDownloads();
+                    if (signature !== TS.dlSignature) {
+                        TS.dlSignature = signature;
+                        tsRenderDownloads();
+                    }
+
                     tsEnsurePolling();
                     finished.forEach(function (title) {
                         tsToast('Descarga completada: ' + title, 'ok');
@@ -720,6 +754,23 @@
                 return tsAuthedUrl(ApiClient.getUrl('Torrent/api/image')
                     + '?u=' + encodeURIComponent(item.posterUrl)
                     + '&r=' + encodeURIComponent(item.detailUrl || ''));
+            }
+
+            function tsGoBack() {
+                try {
+                    if (window.history.length > 1) {
+                        window.history.back();
+                        return;
+                    }
+                } catch (e) {
+                    // Sin historial disponible.
+                }
+
+                if (typeof Dashboard !== 'undefined' && Dashboard.navigate) {
+                    Dashboard.navigate('home.html');
+                } else {
+                    window.location.hash = '#/home.html';
+                }
             }
 
             function tsLoadConfig() {
@@ -976,7 +1027,9 @@
                 }
 
                 empty.style.display = 'none';
-                grid.innerHTML = TS.results.map(function (item, index) {
+                var limit = TS.renderLimit || 60;
+                var shown = TS.results.slice(0, limit);
+                grid.innerHTML = shown.map(function (item, index) {
                     var poster = tsPoster(item);
                     var badges = [];
                     if (item.resolution) { badges.push('<span class="ts-badge q">' + tsEscape(item.resolution) + '</span>'); }
@@ -1025,6 +1078,22 @@
                         + '</div>'
                         + '</div></div>';
                 }).join('');
+
+                var more = page.querySelector('#tsMore');
+                if (more) {
+                    if (TS.results.length > limit) {
+                        more.innerHTML = '<button is="emby-button" type="button" class="raised" id="tsMoreBtn">'
+                            + '<span>Mostrar más (' + (TS.results.length - limit) + ')</span></button>';
+                        more.style.display = 'flex';
+                        more.querySelector('#tsMoreBtn').addEventListener('click', function () {
+                            TS.renderLimit = limit + 60;
+                            tsRenderResults();
+                        });
+                    } else {
+                        more.innerHTML = '';
+                        more.style.display = 'none';
+                    }
+                }
 
                 tsUpdateCardLabels();
             }
@@ -1293,6 +1362,18 @@
                 var page = tsPage();
                 if (!page || page.dataset.tsInit === '1') { return; }
                 page.dataset.tsInit = '1';
+
+                var backBtn = page.querySelector('#tsBack');
+                if (backBtn) {
+                    backBtn.addEventListener('click', tsGoBack);
+                }
+
+                // En la app de cliente el scroll lo debe gestionar la propia
+                // página: el contenedor del dashboard no siempre existe.
+                if (navigator.maxTouchPoints > 0
+                    || /JellyfinMediaPlayer|Android|iPhone|iPad|SmartTV|TV/i.test(navigator.userAgent)) {
+                    page.classList.add('ts-client');
+                }
 
                 page.querySelector('#tsSearchBtn').addEventListener('click', tsSearch);
                 page.querySelector('#tsQuery').addEventListener('keydown', function (event) {
